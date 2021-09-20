@@ -7,6 +7,8 @@ import (
 	"unicode/utf16"
 )
 
+const PlaceHolderString = "==== THIS IS PLACEHOLDER TEXT PLEASE DO NOT TRANSLATE ===="
+
 // TextChunk represents the text data of the txt1 section
 type TextChunk struct {
 	StringLength    uint16
@@ -70,6 +72,10 @@ func ParseTXT(contents []byte) ([]PaneValues, error) {
 		decodedString = strings.Replace(decodedString, "\r\n", "\\n", -1)
 		// Same with Unix newlines
 		decodedString = strings.Replace(decodedString, "\n", "\\n", -1)
+
+		if decodedString == "あああああああああああああああああああ" {
+			decodedString = PlaceHolderString
+		}
 
 		txtXML := PaneValues{
 			Type:       "txt1",
