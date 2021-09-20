@@ -56,12 +56,15 @@ func ParseBRLYT(fileName string) ([]byte, error) {
 		return nil, ErrFileSizeMismatch
 	}
 
-	// Parse the sections. Every BRLYT contains these sections
-	txl, err := ParseTXL(contents)
-	if err != nil {
-		return nil, err
+	var txl []TPLNames = nil
+	if len(findAllOccurrences(contents, []string{"fnl1"})) == 0 {
+		txl, err = ParseTXL(contents)
+		if err != nil {
+			return nil, err
+		}
 	}
 
+	// Parse the sections. Every BRLYT contains these sections
 	txt, err := ParseTXT(contents)
 	if err != nil {
 		return nil, err
