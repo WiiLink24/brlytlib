@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/xml"
+	"fmt"
 	"io/ioutil"
+	"os"
 )
 
 // Header represents the header of our BRLYT
@@ -57,7 +59,7 @@ func ParseBRLYT(fileName string) ([]byte, error) {
 	}
 
 	var txl []TPLNames = nil
-	if len(findAllOccurrences(contents, []string{"fnl1"})) == 0 {
+	if len(findAllOccurrences(contents, []string{"txl1"})) != 0 {
 		txl, err = ParseTXL(contents)
 		if err != nil {
 			return nil, err
