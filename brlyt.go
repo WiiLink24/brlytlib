@@ -18,11 +18,12 @@ type Header struct {
 
 // LYT defines the main layout of the BRLYT
 type LYT struct {
-	Magic [4]byte
-	_     uint32
-	_     [4]byte
-	_     float32
-	_     float32
+	Magic    [4]byte
+	_        uint32
+	Centered [1]byte
+	_        [3]byte
+	Width    float32
+	Height   float32
 }
 
 // BRLYT is the internal structure of our BRLYT
@@ -71,6 +72,11 @@ func ParseBRLYT(fileName string) ([]byte, error) {
 		return nil, err
 	}
 
+	fnl, err := ParseFNL(contents)
+	if err != nil {
+		return nil, err
+	}
+
 	// Now that everything has been parsed, append the panes into 1 slice
 	for _, pane := range txt {
 		pan = append(pan, pane)
@@ -79,6 +85,13 @@ func ParseBRLYT(fileName string) ([]byte, error) {
 	// Finally, build the xml
 	return xml.MarshalIndent(Root{
 		XMLName: xml.Name{},
+		LYT: LYTNode{
+			XMLName:  xml.Name{},
+			Centered: uint16(brlyt.LYT1.Centered[0]),
+			Width:    brlyt.LYT1.Width,
+			Height:   brlyt.LYT1.Height,
+		},
+		FNL:     fnl,
 		TPLName: txl,
 		Panes:   pan,
 	}, "", "\t")

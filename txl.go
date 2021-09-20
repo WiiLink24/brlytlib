@@ -3,21 +3,20 @@ package brlytlib
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/xml"
 	"strings"
 )
 
 type TXL struct {
-	Magic 			[4]byte
-	SectionSize		uint32
-	NumOfTPL		uint16
-	_				uint16
+	Magic       [4]byte
+	SectionSize uint32
+	NumOfTPL    uint16
+	_           uint16
 }
 
 type TPLOffSet struct {
 	// OffSet is relative to the beginning of the txl1 section
-	OffSet			uint32
-	_				uint32
+	OffSet uint32
+	_      uint32
 }
 
 func ParseTXL(contents []byte) ([]TPLNames, error) {
@@ -40,16 +39,16 @@ func ParseTXL(contents []byte) ([]TPLNames, error) {
 	for i := 0; i < int(txl.NumOfTPL); i++ {
 		var tpl TPLOffSet
 		offset := 48 + (i * 8)
-		err = binary.Read(bytes.NewReader(contents[offset:txl.SectionSize + 36]), binary.BigEndian, &tpl)
+		err = binary.Read(bytes.NewReader(contents[offset:txl.SectionSize+36]), binary.BigEndian, &tpl)
 		if err != nil {
 			return nil, err
 		}
 
-		tplOffsets = append(tplOffsets, tpl.OffSet + 48)
+		tplOffsets = append(tplOffsets, tpl.OffSet+48)
 
 		// If we have reached the last index, append the section size to the slice.
-		if i == int(txl.NumOfTPL) - 1 {
-			tplOffsets = append(tplOffsets, txl.SectionSize + 36)
+		if i == int(txl.NumOfTPL)-1 {
+			tplOffsets = append(tplOffsets, txl.SectionSize+36)
 		}
 	}
 
@@ -68,7 +67,6 @@ func ParseTXL(contents []byte) ([]TPLNames, error) {
 	}
 
 	tplNames = append(tplNames, TPLNames{
-		XMLName: xml.Name{},
 		TPLName: tplFormat,
 	})
 
