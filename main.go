@@ -1,12 +1,10 @@
 package main
 
 import (
-	"brlytlib"
 	"io/ioutil"
 	"log"
 	"os"
 )
-
 
 func main() {
 	if len(os.Args) != 3 {
@@ -17,18 +15,12 @@ func main() {
 	input := os.Args[1]
 	output := os.Args[2]
 
-	brlyt, err := brlytlib.ParseBRLYT(input)
+	data, err := ParseBRLYT(input)
 	if err != nil {
 		panic(err)
-		return
-	}
-	if err != nil {
-		panic(err)
-		log.Fatal(err)
-		return
 	}
 
-	err = ioutil.WriteFile(output, brlyt, 0600)
+	err = ioutil.WriteFile(output, data, 0666)
 	if err != nil {
 		panic(err)
 	}

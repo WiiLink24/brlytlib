@@ -1,4 +1,4 @@
-package brlytlib
+package main
 
 import (
 	"bytes"
@@ -7,68 +7,54 @@ import (
 )
 
 type TXL struct {
-	Magic       [4]byte
-	SectionSize uint32
-	NumOfTPL    uint16
-	_           uint16
+	NumOfTPL uint16
+	Unknown  uint16
 }
 
 type TPLOffSet struct {
-	// OffSet is relative to the beginning of the txl1 section
-	OffSet uint32
-	_      uint32
+	// Offset is relative to the beginning of the txl1 section
+	Offset  uint32
+	Padding uint32
 }
 
-func ParseTXL(contents []byte) ([]TPLNames, error) {
-	var txl TXL
+func (r *Root) ParseTXL(data []byte, sectionSize uint32) {
 	var tplOffsets []uint32
-	var tplFormat []TPLNamesFormat
-	var tplNames []TPLNames
+	var tplNames []string
 
-	// All appearances of txl1 are at 0x24.
-	err := binary.Read(bytes.NewReader(contents[0x24:]), binary.BigEndian, &txl)
+	var txl TXL
+	err := binary.Read(bytes.NewReader(data), binary.BigEndian, &txl)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	if txl.Magic != txlMagic {
-		return nil, ErrInvalidTXLHeader
-	}
-
-	// Grab the TPL offsets
 	for i := 0; i < int(txl.NumOfTPL); i++ {
-		var tpl TPLOffSet
-		offset := 48 + (i * 8)
-		err = binary.Read(bytes.NewReader(contents[offset:txl.SectionSize+36]), binary.BigEndian, &tpl)
+		// By now we have only read the header.
+		// We will read the TPLOffset table in order to get our names.
+		var tplTable TPLOffSet
+		offset := 4 + (i * 8)
+
+		err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &tplTable)
 		if err != nil {
-			return nil, err
+			panic(err)
 		}
 
-		tplOffsets = append(tplOffsets, tpl.OffSet+48)
+		tplOffsets = append(tplOffsets, tplTable.Offset+4)
 
 		// If we have reached the last index, append the section size to the slice.
 		if i == int(txl.NumOfTPL)-1 {
-			tplOffsets = append(tplOffsets, txl.SectionSize+36)
+			tplOffsets = append(tplOffsets, sectionSize-8)
 		}
 	}
 
-	// Now that we have the TPL offsets, we can properly get the strings
+	// Now that we have the offsets, retrieve the TPL names.
 	for i := 0; i < int(txl.NumOfTPL); i++ {
-		tplName := string(contents[tplOffsets[i]:tplOffsets[i+1]])
-		// Strip null bytes
+		tplName := string(data[tplOffsets[i]:tplOffsets[i+1]])
+
+		// Strip the null terminator
 		tplName = strings.Replace(tplName, "\x00", "", -1)
 
-		xmlNode := TPLNamesFormat{
-			Index:  i,
-			String: tplName,
-		}
-
-		tplFormat = append(tplFormat, xmlNode)
+		tplNames = append(tplNames, tplName)
 	}
 
-	tplNames = append(tplNames, TPLNames{
-		TPLName: tplFormat,
-	})
-
-	return tplNames, nil
+	r.TXL = &TPLNames{TPLName: tplNames}
 }

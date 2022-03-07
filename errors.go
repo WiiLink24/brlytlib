@@ -1,4 +1,4 @@
-package brlytlib
+package main
 
 import (
 	"errors"

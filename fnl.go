@@ -1,71 +1,61 @@
-package brlytlib
+package main
 
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+	"strings"
 )
 
-// FNLHeader represents the header of the fnl1 section
-type FNLHeader struct {
-	Magic       [4]byte
-	SectionSize uint32
-	NumOfFonts  uint16
-	_           uint16
+// FNL represents the header of the fnl1 section
+type FNL struct {
+	NumOfFonts uint16
+	_          uint16
 }
 
-type FNLOffset struct {
+type FNLTable struct {
 	// OffSet is relative to the beginning of the fnl1 section
 	Offset uint32
 	_      uint32
 }
 
-func ParseFNL(contents []byte) ([]FNLNames, error) {
-	var fnl FNLHeader
-	var fnlNamesFormat []FNLNamesFormat
-	var fnlNames []FNLNames
+func (r *Root) ParseFNL(data []byte, sectionSize uint32) {
+	var fontOffsets []uint32
+	var fontNames []string
 
-	fnlOffset := findAllOccurrences(contents, []string{"fnl1"})
-	var textOffsets []uint32
-
-	// There is only one instance of fnl1 per BRLYT
-	err := binary.Read(bytes.NewReader(contents[fnlOffset[0]:]), binary.BigEndian, &fnl)
+	var fnl FNL
+	err := binary.Read(bytes.NewReader(data), binary.BigEndian, &fnl)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	for i := 0; i < int(fnl.NumOfFonts); i++ {
-		var fnlOffsets FNLOffset
-		offset := (fnlOffset[0] + 12) + (i * 8)
+		// By now we have only read the header.
+		// We will read the FNLOffset table in order to get our names.
+		var fnlTable FNLTable
+		offset := 4 + (i * 8)
 
-		fmt.Println(offset)
-		err := binary.Read(bytes.NewReader(contents[offset:]), binary.BigEndian, &fnlOffsets)
+		err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &fnlTable)
 		if err != nil {
-			return nil, err
+			panic(err)
 		}
 
-		textOffsets = append(textOffsets, fnlOffsets.Offset+uint32(offset))
+		fontOffsets = append(fontOffsets, fnlTable.Offset+4)
 
 		// If we have reached the last index, append the section size to the slice.
 		if i == int(fnl.NumOfFonts)-1 {
-			textOffsets = append(textOffsets, uint32(fnl.SectionSize)+uint32(fnlOffset[0]))
+			fontOffsets = append(fontOffsets, sectionSize-8)
 		}
 	}
 
+	// Now that we have the offsets, retrieve the TPL names.
 	for i := 0; i < int(fnl.NumOfFonts); i++ {
-		fontName := string(contents[textOffsets[i]:textOffsets[i+1]])
+		fontName := string(data[fontOffsets[i]:fontOffsets[i+1]])
 
-		xmlNode := FNLNamesFormat{
-			Index:  i,
-			String: fontName,
-		}
+		// Strip the null terminator
+		fontName = strings.Replace(fontName, "\x00", "", -1)
 
-		fnlNamesFormat = append(fnlNamesFormat, xmlNode)
+		fontNames = append(fontNames, fontName)
 	}
 
-	fnlNames = append(fnlNames, FNLNames{
-		FNLName: fnlNamesFormat,
-	})
-
-	return fnlNames, err
+	r.FNL = &FNLNames{FNLName: fontNames}
 }
