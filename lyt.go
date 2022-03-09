@@ -31,3 +31,20 @@ func (r *Root) ParseLYT(data []byte) {
 		Height:   lyt.Height,
 	}
 }
+
+func (b *BRLYTWriter) WriteLYT(data Root) {
+	header := SectionHeader{
+		Type: SectionTypeLYT,
+		Size: 20,
+	}
+
+	lyt := LYT{
+		Centered: [1]byte{byte(data.LYT.Centered)},
+		Padding:  [3]byte{},
+		Width:    data.LYT.Width,
+		Height:   data.LYT.Height,
+	}
+
+	write(b, header)
+	write(b, lyt)
+}

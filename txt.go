@@ -35,8 +35,8 @@ type TXT struct {
 	_               uint8
 	_               uint16
 	TextOffset      uint32
-	Color1          [4]uint8
-	Color2          [4]uint8
+	TopColor        [4]uint8
+	BottomColor     [4]uint8
 	FontSizeX       float32
 	FontSizeY       float32
 	CharacterSize   float32
@@ -69,10 +69,6 @@ func (r *Root) ParseTXT(data []byte, sectionSize uint32) {
 
 	// Strip null bytes
 	decodedString := strings.Replace(string(utf16.Decode(full)), "\x00", "", -1)
-	// Replace newlines with \n
-	decodedString = strings.Replace(decodedString, "\r\n", "\\n", -1)
-	// Same with Unix newlines
-	decodedString = strings.Replace(decodedString, "\n", "\\n", -1)
 
 	if decodedString == "あああああああああああああああああああ" {
 		decodedString = PlaceHolderString
@@ -83,7 +79,7 @@ func (r *Root) ParseTXT(data []byte, sectionSize uint32) {
 		UserData:        userData,
 		Visible:         text.Flag & 0x1,
 		Widescreen:      (text.Flag & 0x2) >> 1,
-		Flag:            (text.Flag & 0x4) >> 2,
+		Flag:            text.Flag,
 		Origin:          Coord2D{X: float32(text.Origin % 3), Y: float32(text.Origin / 3)},
 		Alpha:           text.Alpha,
 		Padding:         0,
@@ -93,24 +89,100 @@ func (r *Root) ParseTXT(data []byte, sectionSize uint32) {
 		Width:           text.Width,
 		Height:          text.Height,
 		MaxStringLength: text.MaxStringLength,
+		MatIndex:        text.MatIndex,
+		TextAlignment:   text.Alignment,
 		XSize:           text.FontSizeX,
 		YSize:           text.FontSizeY,
 		CharSize:        text.CharacterSize,
 		LineSize:        text.LineSize,
 		TopColor: Color8{
-			R: text.Color1[0],
-			G: text.Color1[1],
-			B: text.Color1[2],
-			A: text.Color1[3],
+			R: text.TopColor[0],
+			G: text.TopColor[1],
+			B: text.TopColor[2],
+			A: text.TopColor[3],
 		},
 		BottomColor: Color8{
-			R: text.Color2[0],
-			G: text.Color2[1],
-			B: text.Color2[2],
-			A: text.Color2[3],
+			R: text.BottomColor[0],
+			G: text.BottomColor[1],
+			B: text.BottomColor[2],
+			A: text.BottomColor[3],
 		},
 		Text: decodedString,
 	}
 
 	r.Panes = append(r.Panes, Children{TXT: &txtXML})
+}
+
+func (b *BRLYTWriter) WriteTXT(txt XMLTXT) {
+	temp := bytes.NewBuffer(nil)
+
+	header := SectionHeader{
+		Type: SectionTypeTXT,
+		Size: 124,
+	}
+
+	var name [16]byte
+	copy(name[:], txt.Name)
+
+	var userData [8]byte
+	copy(userData[:], txt.UserData)
+
+	text := strings.Replace(txt.Text, "\\n", "\n", -1)
+	encodedText := utf16.Encode([]rune(text))
+
+	textLength := len(txt.Text)*2 + 2
+	if txt.Text == "灡攱" {
+		// For some reason Go recognizes this string as 4 characters when in reality it is 2.
+		textLength = 6
+	}
+
+	pane := TXT{
+		Flag:            txt.Flag,
+		Origin:          uint8(txt.Origin.X + (txt.Origin.Y * 3)),
+		Alpha:           txt.Alpha,
+		PaneName:        name,
+		UserData:        userData,
+		XTranslation:    txt.Translate.X,
+		YTranslation:    txt.Translate.Y,
+		ZTranslation:    txt.Translate.Z,
+		XRotate:         txt.Rotate.X,
+		YRotate:         txt.Rotate.Y,
+		ZRotate:         txt.Rotate.Z,
+		XScale:          txt.Scale.X,
+		YScale:          txt.Scale.Y,
+		Width:           txt.Width,
+		Height:          txt.Height,
+		StringLength:    uint16(textLength),
+		MaxStringLength: txt.MaxStringLength,
+		MatIndex:        txt.MatIndex,
+		FontIndex:       0,
+		Alignment:       txt.TextAlignment,
+		TextOffset:      116,
+		TopColor:        [4]uint8{txt.TopColor.R, txt.TopColor.G, txt.TopColor.B, txt.TopColor.A},
+		BottomColor:     [4]uint8{txt.BottomColor.R, txt.BottomColor.G, txt.BottomColor.B, txt.BottomColor.A},
+		FontSizeX:       txt.XSize,
+		FontSizeY:       txt.YSize,
+		CharacterSize:   txt.CharSize,
+		LineSize:        txt.LineSize,
+	}
+
+	write(temp, header)
+	write(temp, pane)
+	write(temp, encodedText)
+
+	pos := 0
+	for (b.Len()+temp.Len())%4 != 0 {
+		_, err := temp.Write([]byte{0})
+		if err != nil {
+			panic(err)
+		}
+		pos += 1
+	}
+
+	if pos == 0 {
+		write(temp, uint32(0))
+	}
+
+	binary.BigEndian.PutUint32(temp.Bytes()[4:8], uint32(temp.Len()))
+	write(b, temp.Bytes())
 }

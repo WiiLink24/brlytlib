@@ -120,7 +120,7 @@ func (r *Root) ParseWND(data []byte) {
 		UserData:    userData,
 		Visible:     wnd.Flag & 0x1,
 		Widescreen:  (wnd.Flag & 0x2) >> 1,
-		Flag:        (wnd.Flag & 0x4) >> 2,
+		Flag:        wnd.Flag,
 		Origin:      Coord2D{X: float32(wnd.Origin % 3), Y: float32(wnd.Origin / 3)},
 		Alpha:       wnd.Alpha,
 		Padding:     0,
@@ -163,4 +163,92 @@ func (r *Root) ParseWND(data []byte) {
 	}
 
 	r.Panes = append(r.Panes, Children{WND: &xmlData})
+}
+
+func (b *BRLYTWriter) WriteWND(data XMLWindow) {
+	temp := bytes.NewBuffer(nil)
+
+	header := SectionHeader{
+		Type: SectionTypeWND,
+		Size: 76,
+	}
+
+	var name [16]byte
+	copy(name[:], data.Name)
+
+	var userData [8]byte
+	copy(userData[:], data.UserData)
+
+	wnd := Window{
+		Flag:              data.Flag,
+		Origin:            uint8(data.Origin.X + (data.Origin.Y * 3)),
+		Alpha:             data.Alpha,
+		PaneName:          name,
+		UserData:          userData,
+		XTranslation:      data.Translate.X,
+		YTranslation:      data.Translate.Y,
+		ZTranslation:      data.Translate.Z,
+		XRotate:           data.Rotate.X,
+		YRotate:           data.Rotate.Y,
+		ZRotate:           data.Rotate.Z,
+		XScale:            data.Scale.X,
+		YScale:            data.Scale.Y,
+		Width:             data.Width,
+		Height:            data.Height,
+		Coordinate1:       data.Coordinate1,
+		Coordinate2:       data.Coordinate2,
+		Coordinate3:       data.Coordinate3,
+		Coordinate4:       data.Coordinate4,
+		FrameCount:        uint8(len(data.Materials.Mats)),
+		WindowOffset:      104,
+		WindowFrameOffset: uint32(124 + len(data.UVSets.Set)*32),
+		TopLeftColor:      [4]uint8{data.TopLeftColor.R, data.TopLeftColor.G, data.TopLeftColor.B, data.TopLeftColor.A},
+		TopRightColor:     [4]uint8{data.TopRightColor.R, data.TopRightColor.G, data.TopRightColor.B, data.TopRightColor.A},
+		BottomLeftColor:   [4]uint8{data.BottomLeftColor.R, data.BottomLeftColor.G, data.BottomLeftColor.B, data.BottomLeftColor.A},
+		BottomRightColor:  [4]uint8{data.BottomRightColor.R, data.BottomRightColor.G, data.BottomRightColor.B, data.BottomRightColor.A},
+		MatIndex:          data.MatIndex,
+		NumOfUVSets:       uint8(len(data.UVSets.Set)),
+	}
+
+	write(temp, header)
+	write(temp, wnd)
+
+	// Write the UV Sets
+	for _, set := range data.UVSets.Set {
+		uvSet := UVSet{
+			TopLeftS:     set.CoordTL.S,
+			TopLeftT:     set.CoordTL.T,
+			TopRightS:    set.CoordTR.S,
+			TopRightT:    set.CoordTR.T,
+			BottomLeftS:  set.CoordBL.S,
+			BottomLeftT:  set.CoordBL.T,
+			BottomRightS: set.CoordBR.S,
+			BottomRightT: set.CoordBR.T,
+		}
+
+		write(temp, uvSet)
+	}
+
+	// Write the offsets to the Window Mats
+	for i := 0; i < len(data.Materials.Mats); i++ {
+		var offset uint32
+
+		offset = uint32(temp.Len() + (len(data.Materials.Mats) * 4))
+
+		write(temp, offset)
+	}
+
+	// Write Window Mats
+	for _, mat := range data.Materials.Mats {
+		windowMat := WindowMat{
+			MatIndex: mat.MatIndex,
+			Index:    mat.Index,
+		}
+
+		write(temp, windowMat)
+	}
+
+	binary.BigEndian.PutUint32(temp.Bytes()[4:8], uint32(temp.Len()))
+
+	write(b, temp.Bytes())
 }

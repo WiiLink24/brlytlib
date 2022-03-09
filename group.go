@@ -51,3 +51,46 @@ func (r *Root) ParseGRE() {
 		GRE: &XMLGRE{},
 	})
 }
+
+func (b *BRLYTWriter) WriteGRP(data XMLGRP) {
+	header := SectionHeader{
+		Type: SectionTypeGRP,
+		Size: uint32(28 + (16 * len(data.Entries))),
+	}
+
+	var name [16]byte
+	copy(name[:], data.Name)
+
+	grp := GRP{
+		Name:         name,
+		NumOfEntries: uint16(len(data.Entries)),
+	}
+
+	write(b, header)
+	write(b, grp)
+
+	for _, str := range data.Entries {
+		var entry [16]byte
+		copy(entry[:], str)
+
+		write(b, entry)
+	}
+}
+
+func (b *BRLYTWriter) WriteGRS() {
+	header := SectionHeader{
+		Type: SectionTypeGRS,
+		Size: 8,
+	}
+
+	write(b, header)
+}
+
+func (b *BRLYTWriter) WriteGRE() {
+	header := SectionHeader{
+		Type: SectionTypeGRE,
+		Size: 8,
+	}
+
+	write(b, header)
+}

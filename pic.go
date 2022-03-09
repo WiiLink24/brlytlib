@@ -94,7 +94,7 @@ func (r *Root) ParsePIC(data []byte) {
 		UserData:   userData,
 		Visible:    pic.Flag & 0x1,
 		Widescreen: (pic.Flag & 0x2) >> 1,
-		Flag:       (pic.Flag & 0x4) >> 2,
+		Flag:       pic.Flag,
 		Origin:     Coord2D{X: float32(pic.Origin % 3), Y: float32(pic.Origin / 3)},
 		Alpha:      pic.Alpha,
 		Padding:    0,
@@ -132,4 +132,59 @@ func (r *Root) ParsePIC(data []byte) {
 	}
 
 	r.Panes = append(r.Panes, Children{PIC: &xmlData})
+}
+
+func (b *BRLYTWriter) WritePIC(pic XMLPIC) {
+	header := SectionHeader{
+		Type: SectionTypePIC,
+		Size: uint32(96 + (32 * len(pic.UVSets.Set))),
+	}
+	var name [16]byte
+	copy(name[:], pic.Name)
+
+	var userData [8]byte
+	copy(userData[:], pic.UserData)
+
+	pane := PIC{
+		Flag:             pic.Flag,
+		Origin:           uint8(pic.Origin.X + (pic.Origin.Y * 3)),
+		Alpha:            pic.Alpha,
+		PaneName:         name,
+		UserData:         userData,
+		XTranslation:     pic.Translate.X,
+		YTranslation:     pic.Translate.Y,
+		ZTranslation:     pic.Translate.Z,
+		XRotate:          pic.Rotate.X,
+		YRotate:          pic.Rotate.Y,
+		ZRotate:          pic.Rotate.Z,
+		XScale:           pic.Scale.X,
+		YScale:           pic.Scale.Y,
+		Width:            pic.Width,
+		Height:           pic.Height,
+		TopLeftColor:     [4]uint8{pic.TopLeftColor.R, pic.TopLeftColor.G, pic.TopLeftColor.B, pic.TopLeftColor.A},
+		TopRightColor:    [4]uint8{pic.TopRightColor.R, pic.TopRightColor.G, pic.TopRightColor.B, pic.TopRightColor.A},
+		BottomLeftColor:  [4]uint8{pic.BottomLeftColor.R, pic.BottomLeftColor.G, pic.BottomLeftColor.B, pic.BottomLeftColor.A},
+		BottomRightColor: [4]uint8{pic.BottomRightColor.R, pic.BottomRightColor.G, pic.BottomRightColor.B, pic.BottomRightColor.A},
+		MatIndex:         pic.MatIndex,
+		NumOfUVSets:      uint8(len(pic.UVSets.Set)),
+	}
+
+	write(b, header)
+	write(b, pane)
+
+	// Write the UV Sets
+	for _, set := range pic.UVSets.Set {
+		uvSet := UVSet{
+			TopLeftS:     set.CoordTL.S,
+			TopLeftT:     set.CoordTL.T,
+			TopRightS:    set.CoordTR.S,
+			TopRightT:    set.CoordTR.T,
+			BottomLeftS:  set.CoordBL.S,
+			BottomLeftT:  set.CoordBL.T,
+			BottomRightS: set.CoordBR.S,
+			BottomRightT: set.CoordBR.T,
+		}
+
+		write(b, uvSet)
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/xml"
+	"io"
 	"io/ioutil"
 )
 
@@ -40,6 +41,10 @@ var (
 type SectionHeader struct {
 	Type SectionTypes
 	Size uint32
+}
+
+type BRLYTWriter struct {
+	*bytes.Buffer
 }
 
 func ParseBRLYT(fileName string) ([]byte, error) {
@@ -83,6 +88,13 @@ func ParseBRLYT(fileName string) ([]byte, error) {
 		// Subtract the header size
 		sectionSize := int(sectionHeader.Size) - 8
 		if readable.Len() == 0 {
+			// If our type is one of the section ending types, we can write then finish.
+			switch sectionHeader.Type {
+			case SectionTypePAE:
+				root.ParsePAE()
+			case SectionTypeGRE:
+				root.ParseGRE()
+			}
 			continue
 		}
 
@@ -130,4 +142,96 @@ func ParseBRLYT(fileName string) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+func WriteBRLYT(data []byte) ([]byte, error) {
+	var root Root
+	err := xml.Unmarshal(data, &root)
+	if err != nil {
+		return nil, err
+	}
+
+	writer := BRLYTWriter{bytes.NewBuffer(nil)}
+
+	// First write the header
+	header := Header{
+		Magic:        headerMagic,
+		BOM:          0xFEFF000A,
+		FileSize:     0,
+		HeaderLen:    16,
+		SectionCount: 0,
+	}
+
+	err = binary.Write(writer, binary.BigEndian, header)
+	if err != nil {
+		return nil, err
+	}
+
+	sectionCount := len(root.Panes)
+
+	// Write the LYT1 section
+	writer.WriteLYT(root)
+	sectionCount += 1
+
+	if root.TXL != nil {
+		// Write TXL section
+		writer.WriteTXL(root)
+		sectionCount += 1
+	}
+
+	if root.FNL != nil {
+		// Write FNL section
+		writer.WriteFNL(root)
+		sectionCount += 1
+	}
+
+	// Write MAT section
+	writer.WriteMAT(root)
+	sectionCount += 1
+
+	for _, pane := range root.Panes {
+		// Please bear with me, we must check which pane is not nil
+		if pane.Pane != nil {
+			writer.WritePane(*pane.Pane)
+		}
+		if pane.PAS != nil {
+			writer.WritePAS()
+		}
+		if pane.PAE != nil {
+			writer.WritePAE()
+		}
+		if pane.BND != nil {
+			writer.WriteBND(*pane.BND)
+		}
+		if pane.PIC != nil {
+			writer.WritePIC(*pane.PIC)
+		}
+		if pane.TXT != nil {
+			writer.WriteTXT(*pane.TXT)
+		}
+		if pane.WND != nil {
+			writer.WriteWND(*pane.WND)
+		}
+		if pane.GRP != nil {
+			writer.WriteGRP(*pane.GRP)
+		}
+		if pane.GRS != nil {
+			writer.WriteGRS()
+		}
+		if pane.GRE != nil {
+			writer.WriteGRE()
+		}
+	}
+
+	binary.BigEndian.PutUint32(writer.Bytes()[8:12], uint32(writer.Len()))
+	binary.BigEndian.PutUint16(writer.Bytes()[14:16], uint16(sectionCount))
+
+	return writer.Bytes(), nil
+}
+
+func write(writer io.Writer, data interface{}) {
+	err := binary.Write(writer, binary.BigEndian, data)
+	if err != nil {
+		panic(err)
+	}
 }

@@ -62,11 +62,43 @@ type MATColor struct {
 	A uint8
 }
 
+type TevSwapModeTable struct {
+	B1 uint8
+	B2 uint8
+	B3 uint8
+	B4 uint8
+}
+
 type MATIndirectTextureOrderEntry struct {
 	TexCoord uint8
 	TexMap   uint8
 	ScaleS   uint8
 	ScaleT   uint8
+}
+
+type MATTevStageEntry struct {
+	TexCoor uint8
+	Color   uint8
+	U16     uint16
+	B1      uint8
+	B2      uint8
+	B3      uint8
+	B4      uint8
+	B5      uint8
+	B6      uint8
+	B7      uint8
+	B8      uint8
+	B9      uint8
+	B10     uint8
+	B11     uint8
+	B12     uint8
+}
+
+type MatAlphaCompare struct {
+	Temp    uint8
+	AlphaOP uint8
+	Ref0    uint8
+	Ref1    uint8
 }
 
 func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
@@ -124,7 +156,7 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 			}
 
 			if r.TXL.TPLName != nil {
-				xmlTexture.Name = r.TXL.TPLName[i]
+				xmlTexture.Name = r.TXL.TPLName[texEntry.TexIndex]
 			}
 
 			offset += 4
@@ -171,30 +203,74 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 			texCoorGenEntries[i] = xmlCoorGen
 		}
 
-		// TODO: Implement the below into the XML. I have not seen these types so they are not priority
-
-		var chanControl MATChanControl
+		var chanControlXML *ChanControlXML
 		if BitExtract(matMaterials.BitFlag, 6, 100) == 1 {
+			var chanControl MATChanControl
+
 			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &chanControl)
 			if err != nil {
 				panic(err)
 			}
 
-			offset += 4
-		}
-
-		var matColor MATColor
-		if BitExtract(matMaterials.BitFlag, 4, 100) == 1 {
-			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &matColor)
-			if err != nil {
-				panic(err)
+			chanControlXML = &ChanControlXML{
+				ColorMaterialSource: chanControl.ColorMaterialSource,
+				AlphaMaterialSource: chanControl.ColorMaterialSource,
 			}
 
 			offset += 4
 		}
 
-		// TODO: Implement MATTevSwapModeTable
-		indirectTextureSRTEntries := make([]MATTextureSRTEntry, BitExtract(matMaterials.BitFlag, 17, 18))
+		var matColorXML *Color8
+		if BitExtract(matMaterials.BitFlag, 4, 100) == 1 {
+			var matColor MATColor
+
+			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &matColor)
+			if err != nil {
+				panic(err)
+			}
+
+			matColorXML = &Color8{
+				R: matColor.R,
+				G: matColor.G,
+				B: matColor.B,
+				A: matColor.A,
+			}
+
+			offset += 4
+		}
+
+		var tevSwapModeTableXML *TevSwapModeTableXML
+		if BitExtract(matMaterials.BitFlag, 19, 100) == 1 {
+			var tevSwapModeTable TevSwapModeTable
+
+			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &tevSwapModeTable)
+			if err != nil {
+				panic(err)
+			}
+
+			tevSwapModeTableXML = &TevSwapModeTableXML{
+				AR: (tevSwapModeTable.B1 >> 0) & 0x3,
+				AG: (tevSwapModeTable.B1 >> 2) & 0x3,
+				AB: (tevSwapModeTable.B1 >> 4) & 0x3,
+				AA: (tevSwapModeTable.B1 >> 6) & 0x3,
+				BR: (tevSwapModeTable.B2 >> 0) & 0x3,
+				BG: (tevSwapModeTable.B2 >> 2) & 0x3,
+				BB: (tevSwapModeTable.B2 >> 4) & 0x3,
+				BA: (tevSwapModeTable.B2 >> 6) & 0x3,
+				CR: (tevSwapModeTable.B3 >> 0) & 0x3,
+				CG: (tevSwapModeTable.B3 >> 2) & 0x3,
+				CB: (tevSwapModeTable.B3 >> 4) & 0x3,
+				CA: (tevSwapModeTable.B3 >> 6) & 0x3,
+				DR: (tevSwapModeTable.B4 >> 0) & 0x3,
+				DG: (tevSwapModeTable.B4 >> 2) & 0x3,
+				DB: (tevSwapModeTable.B4 >> 4) & 0x3,
+				DA: (tevSwapModeTable.B4 >> 6) & 0x3,
+			}
+
+			offset += 4
+		}
+
+		indirectTextureSRTEntries := make([]MATSRT, BitExtract(matMaterials.BitFlag, 17, 18))
 		for i := 0; i < BitExtract(matMaterials.BitFlag, 17, 18); i++ {
 			var texSRTEntry MATTextureSRTEntry
 
@@ -203,24 +279,132 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 				panic(err)
 			}
 
+			xmlSRT := MATSRT{
+				XTrans:   texSRTEntry.XTrans,
+				YTrans:   texSRTEntry.YTrans,
+				Rotation: texSRTEntry.Rotation,
+				XScale:   texSRTEntry.XScale,
+				YScale:   texSRTEntry.YScale,
+			}
+
 			offset += 20
-			indirectTextureSRTEntries = append(indirectTextureSRTEntries, texSRTEntry)
+			indirectTextureSRTEntries[i] = xmlSRT
 		}
 
-		indirectTextureOrderEntries := make([]MATIndirectTextureOrderEntry, BitExtract(matMaterials.BitFlag, 14, 16))
+		indirectTextureOrderEntries := make([]MATIndirectOrderEntryXML, BitExtract(matMaterials.BitFlag, 14, 16))
 		for i := 0; i < BitExtract(matMaterials.BitFlag, 14, 16); i++ {
-			var indirectTexOrderEntry MATIndirectTextureOrderEntry
+			var texOrderEntry MATIndirectTextureOrderEntry
 
-			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &indirectTexOrderEntry)
+			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &texOrderEntry)
 			if err != nil {
 				panic(err)
 			}
 
+			xmlEntry := MATIndirectOrderEntryXML{
+				TexCoord: texOrderEntry.TexCoord,
+				TexMap:   texOrderEntry.TexMap,
+				ScaleS:   texOrderEntry.ScaleS,
+				ScaleT:   texOrderEntry.ScaleT,
+			}
+
 			offset += 4
-			indirectTextureOrderEntries = append(indirectTextureOrderEntries, indirectTexOrderEntry)
+			indirectTextureOrderEntries[i] = xmlEntry
 		}
 
-		// TODO: Implement MATTevStageEntry, MATAlphaCompare and MATBlendMode
+		tevStageEntries := make([]MATTevStageEntryXML, BitExtract(matMaterials.BitFlag, 9, 13))
+		for i := 0; i < BitExtract(matMaterials.BitFlag, 9, 13); i++ {
+			var temp MATTevStageEntry
+
+			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &temp)
+			if err != nil {
+				panic(err)
+			}
+
+			colorClamp := 0
+			if temp.B4&0x1 == 1 {
+				colorClamp = 1
+			}
+
+			alphaClamp := 0
+			if temp.B8&0x1 == 1 {
+				alphaClamp = 1
+			}
+
+			entry := MATTevStageEntryXML{
+				TexCoor:          temp.TexCoor,
+				Color:            temp.Color,
+				TexMap:           temp.U16 & 0x1ff,
+				RasSel:           uint8((temp.U16 & 0x7ff) >> 9),
+				TexSel:           uint8(temp.U16 >> 11),
+				ColorA:           temp.B1 & 0xf,
+				ColorB:           temp.B1 >> 4,
+				ColorC:           temp.B2 & 0xf,
+				ColorD:           temp.B2 >> 4,
+				ColorOP:          temp.B3 & 0xf,
+				ColorBias:        (temp.B3 & 0x3f) >> 4,
+				ColorScale:       temp.B3 >> 6,
+				ColorClamp:       uint8(colorClamp),
+				ColorRegID:       (temp.B4 & 0x7) >> 1,
+				ColorConstantSel: temp.B4 >> 3,
+				AlphaA:           temp.B5 & 0xf,
+				AlphaB:           temp.B5 >> 4,
+				AlphaC:           temp.B6 & 0xf,
+				AlphaD:           temp.B6 >> 4,
+				AlphaOP:          temp.B7 & 0xf,
+				AlphaBias:        (temp.B7 & 0x3f) >> 4,
+				AlphaScale:       temp.B7 >> 6,
+				AlphaClamp:       uint8(alphaClamp),
+				AlphaRegID:       (temp.B8 & 0x7) >> 1,
+				AlphaConstantSel: temp.B8 >> 3,
+				TexID:            temp.B9 & 0x3,
+				Bias:             temp.B10 & 0x7,
+				Matrix:           (temp.B10 & 0x7F) >> 3,
+				WrapS:            temp.B11 & 0x7,
+				WrapT:            (temp.B11 & 0x3F) >> 3,
+				Format:           temp.B12 & 0x3,
+				AddPrevious:      (temp.B12 & 0x7) >> 2,
+				UTCLod:           (temp.B12 & 0xF) >> 3,
+				Alpha:            (temp.B12 & 0x3F) >> 4,
+			}
+
+			tevStageEntries[i] = entry
+
+			offset += 16
+		}
+
+		var alphaCompareXML *MATAlphaCompareXML
+		if BitExtract(matMaterials.BitFlag, 8, 8) == 1 {
+			var alphaCompare MatAlphaCompare
+
+			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &alphaCompare)
+			if err != nil {
+				panic(err)
+			}
+
+			alphaCompareXML = &MATAlphaCompareXML{
+				Comp0:   alphaCompare.Temp & 0x7,
+				Comp1:   (alphaCompare.Temp >> 4) & 0x7,
+				AlphaOP: alphaCompare.AlphaOP,
+				Ref0:    alphaCompare.Ref0,
+				Ref1:    alphaCompare.Ref1,
+			}
+
+			offset += 4
+		}
+
+		var blendModeXML *MATBlendMode
+		if BitExtract(matMaterials.BitFlag, 7, 7) == 1 {
+			var blendMode MATBlendMode
+
+			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &blendMode)
+			if err != nil {
+				panic(err)
+			}
+
+			blendModeXML = &blendMode
+			offset += 4
+		}
+
 		matName := string(matMaterials.Name[:])
 		matName = strings.Replace(matName, "\x00", "", -1)
 
@@ -268,15 +452,290 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 				B: matMaterials.TevColor4[2],
 				A: matMaterials.TevColor4[3],
 			},
-			Textures: textureEntries,
-			SRT:      textureSRTEntries,
-			CoordGen: texCoorGenEntries,
+			BitFlag:              matMaterials.BitFlag,
+			Textures:             textureEntries,
+			SRT:                  textureSRTEntries,
+			CoordGen:             texCoorGenEntries,
+			ChanControl:          chanControlXML,
+			MatColor:             matColorXML,
+			TevSwapMode:          tevSwapModeTableXML,
+			IndirectSRT:          indirectTextureSRTEntries,
+			IndirectTextureOrder: indirectTextureOrderEntries,
+			TevStageEntry:        tevStageEntries,
+			AlphaCompare:         alphaCompareXML,
+			BlendMode:            blendModeXML,
 		}
 
 		matEntries = append(matEntries, xmlData)
 	}
 
 	r.MAT = MATNode{Entries: matEntries}
+}
+
+func (b *BRLYTWriter) WriteMAT(data Root) {
+	temp := bytes.NewBuffer(nil)
+
+	header := SectionHeader{
+		Type: SectionTypeMAT,
+		Size: 0,
+	}
+
+	meta := MAT{NumOfMats: uint16(len(data.MAT.Entries))}
+
+	offsets := make([]MATOffset, len(data.MAT.Entries))
+	offsets[0].Offset = uint32(len(data.MAT.Entries)*4 + 12)
+
+	count := 12 + (len(data.MAT.Entries) * 4)
+	for i, entry := range data.MAT.Entries {
+		if i != 0 {
+			offsets[i].Offset = uint32(count)
+		}
+
+		var name [20]byte
+		copy(name[:], entry.Name)
+
+		material := MATMaterials{
+			Name:      name,
+			ForeColor: [4]int16{entry.ForeColor.R, entry.ForeColor.G, entry.ForeColor.B, entry.ForeColor.A},
+			BackColor: [4]int16{entry.BackColor.R, entry.BackColor.G, entry.BackColor.B, entry.BackColor.A},
+			ColorReg3: [4]int16{entry.ColorReg3.R, entry.ColorReg3.G, entry.ColorReg3.B, entry.ColorReg3.A},
+			TevColor1: [4]uint8{entry.TevColor1.R, entry.TevColor1.G, entry.TevColor1.B, entry.TevColor1.A},
+			TevColor2: [4]uint8{entry.TevColor2.R, entry.TevColor2.G, entry.TevColor2.B, entry.TevColor2.A},
+			TevColor3: [4]uint8{entry.TevColor3.R, entry.TevColor3.G, entry.TevColor3.B, entry.TevColor3.A},
+			TevColor4: [4]uint8{entry.TevColor4.R, entry.TevColor4.G, entry.TevColor4.B, entry.TevColor4.A},
+			BitFlag:   entry.BitFlag,
+		}
+
+		write(temp, material)
+		count += 64
+
+		for _, texture := range entry.Textures {
+			for i2, s := range data.TXL.TPLName {
+				if texture.Name == s {
+					tex := MATTextureEntry{
+						TexIndex: uint16(i2),
+						SWrap:    texture.SWrap,
+						TWrap:    texture.TWrap,
+					}
+
+					write(temp, tex)
+					count += 4
+				}
+			}
+		}
+
+		for _, srt := range entry.SRT {
+			srtEntry := MATTextureSRTEntry{
+				XTrans:   srt.XTrans,
+				YTrans:   srt.YTrans,
+				Rotation: srt.Rotation,
+				XScale:   srt.XScale,
+				YScale:   srt.YScale,
+			}
+
+			write(temp, srtEntry)
+			count += 20
+		}
+
+		for _, gen := range entry.CoordGen {
+			coorEntry := MATTexCoordGenEntry{
+				Type:         gen.Type,
+				Source:       gen.Source,
+				MatrixSource: gen.MatrixSource,
+			}
+
+			write(temp, coorEntry)
+			count += 4
+		}
+
+		if entry.ChanControl != nil {
+			chanControl := MATChanControl{
+				ColorMaterialSource: entry.ChanControl.ColorMaterialSource,
+				AlphaMaterialSource: entry.ChanControl.AlphaMaterialSource,
+			}
+
+			write(temp, chanControl)
+			count += 4
+		}
+
+		if entry.MatColor != nil {
+			matColor := MATColor{
+				R: entry.MatColor.R,
+				G: entry.MatColor.B,
+				B: entry.MatColor.G,
+				A: entry.MatColor.A,
+			}
+
+			write(temp, matColor)
+			count += 4
+		}
+
+		if entry.TevSwapMode != nil {
+			var b1 uint8 = 0
+			b1 |= (entry.TevSwapMode.AA & 0x3) << 6
+			b1 |= (entry.TevSwapMode.AB & 0x3) << 4
+			b1 |= (entry.TevSwapMode.AG & 0x3) << 2
+			b1 |= (entry.TevSwapMode.AR & 0x3) << 0
+
+			var b2 uint8 = 0
+			b2 |= (entry.TevSwapMode.BA & 0x3) << 6
+			b2 |= (entry.TevSwapMode.BB & 0x3) << 4
+			b2 |= (entry.TevSwapMode.BG & 0x3) << 2
+			b2 |= (entry.TevSwapMode.BR & 0x3) << 0
+
+			var b3 uint8 = 0
+			b3 |= (entry.TevSwapMode.CA & 0x3) << 6
+			b3 |= (entry.TevSwapMode.CB & 0x3) << 4
+			b3 |= (entry.TevSwapMode.CG & 0x3) << 2
+			b3 |= (entry.TevSwapMode.CR & 0x3) << 0
+
+			var b4 uint8 = 0
+			b4 |= (entry.TevSwapMode.DA & 0x3) << 6
+			b4 |= (entry.TevSwapMode.DB & 0x3) << 4
+			b4 |= (entry.TevSwapMode.DG & 0x3) << 2
+			b4 |= (entry.TevSwapMode.DR & 0x3) << 0
+
+			tevSwap := TevSwapModeTable{
+				B1: b1,
+				B2: b2,
+				B3: b3,
+				B4: b4,
+			}
+
+			write(temp, tevSwap)
+			count += 4
+		}
+
+		for _, matsrt := range entry.IndirectSRT {
+			srt := MATSRT{
+				XTrans:   matsrt.XTrans,
+				YTrans:   matsrt.YTrans,
+				Rotation: matsrt.Rotation,
+				XScale:   matsrt.XScale,
+				YScale:   matsrt.YScale,
+			}
+
+			write(temp, srt)
+			count += 20
+		}
+
+		for _, tex := range entry.IndirectTextureOrder {
+			indirectTex := MATIndirectTextureOrderEntry{
+				TexCoord: tex.TexCoord,
+				TexMap:   tex.TexMap,
+				ScaleS:   tex.ScaleS,
+				ScaleT:   tex.ScaleT,
+			}
+
+			write(temp, indirectTex)
+			count += 4
+		}
+
+		for _, stageEntry := range entry.TevStageEntry {
+			var U16 uint16 = 0
+			U16 |= uint16((stageEntry.TexSel & 0x3F) << 11)
+			U16 |= uint16((stageEntry.RasSel & 0x7) << 9)
+			U16 |= (stageEntry.TexMap & 0x1ff) << 0
+
+			var B1 uint8 = 0
+			B1 |= (stageEntry.ColorB & 0xf) << 4
+			B1 |= (stageEntry.ColorA & 0xf) << 0
+
+			var B2 uint8 = 0
+			B2 |= (stageEntry.ColorD & 0xf) << 4
+			B2 |= (stageEntry.ColorC & 0xf) << 0
+
+			var B3 uint8 = 0
+			B3 |= (stageEntry.ColorScale & 0x3) << 6
+			B3 |= (stageEntry.ColorBias & 0x3) << 4
+			B3 |= (stageEntry.ColorOP & 0xf) << 0
+
+			var B4 uint8 = 0
+			B4 |= (stageEntry.ColorConstantSel & 0x1F) << 3
+			B4 |= (stageEntry.ColorRegID & 0x7) << 1
+			B4 |= (stageEntry.ColorClamp) << 0
+
+			var B5 uint8 = 0
+			B5 |= (stageEntry.AlphaB & 0xf) << 4
+			B5 |= (stageEntry.AlphaA & 0xf) << 0
+
+			var B6 uint8 = 0
+			B6 |= (stageEntry.AlphaD & 0xf) << 4
+			B6 |= (stageEntry.AlphaC & 0xf) << 0
+
+			var B7 uint8 = 0
+			B7 |= (stageEntry.AlphaScale & 0x3) << 6
+			B7 |= (stageEntry.AlphaBias & 0x3) << 4
+			B7 |= (stageEntry.AlphaOP & 0xf) << 0
+
+			var B8 uint8 = 0
+			B8 |= (stageEntry.AlphaConstantSel & 0x1F) << 3
+			B8 |= (stageEntry.AlphaRegID & 0x7) << 1
+			B8 |= (stageEntry.AlphaClamp) << 0
+
+			var B10 uint8 = 0
+			B10 |= (stageEntry.Matrix & 0x1F) << 3
+			B10 |= (stageEntry.Bias & 0x7) << 0
+
+			var B11 uint8 = 0
+			B11 |= (stageEntry.WrapT & 0x7) << 3
+			B11 |= (stageEntry.WrapS & 0x7) << 0
+
+			var B12 uint8 = 0
+			B12 |= (stageEntry.Alpha & 0xF) << 4
+			B12 |= (stageEntry.UTCLod & 0x1) << 3
+			B12 |= (stageEntry.AddPrevious & 0x1) << 2
+			B12 |= (stageEntry.Format & 0x3) << 0
+
+			entry := MATTevStageEntry{
+				TexCoor: stageEntry.TexCoor,
+				Color:   stageEntry.Color,
+				U16:     U16,
+				B1:      B1,
+				B2:      B2,
+				B3:      B3,
+				B4:      B4,
+				B5:      B5,
+				B6:      B6,
+				B7:      B7,
+				B8:      B8,
+				B9:      stageEntry.TexID & 0x3,
+				B10:     B10,
+				B11:     B11,
+				B12:     B12,
+			}
+
+			write(temp, entry)
+			count += 16
+		}
+
+		if entry.AlphaCompare != nil {
+			var tempValue uint8 = 0
+			tempValue |= (entry.AlphaCompare.Comp1 & 0x7) << 4
+			tempValue |= (entry.AlphaCompare.Comp0 & 0x7) << 0
+
+			entry := MatAlphaCompare{
+				Temp:    tempValue,
+				AlphaOP: entry.AlphaCompare.AlphaOP,
+				Ref0:    entry.AlphaCompare.Ref0,
+				Ref1:    entry.AlphaCompare.Ref1,
+			}
+
+			write(temp, entry)
+			count += 4
+		}
+
+		if entry.BlendMode != nil {
+			write(temp, entry.BlendMode)
+			count += 4
+		}
+	}
+
+	header.Size = uint32(count)
+	write(b, header)
+	write(b, meta)
+	write(b, offsets)
+	write(b, temp.Bytes())
 }
 
 func BitExtract(num uint32, start int, end int) int {

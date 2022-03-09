@@ -58,3 +58,53 @@ func (r *Root) ParseTXL(data []byte, sectionSize uint32) {
 
 	r.TXL = &TPLNames{TPLName: tplNames}
 }
+
+func (b *BRLYTWriter) WriteTXL(data Root) {
+	sectionWriter := bytes.NewBuffer(nil)
+
+	header := SectionHeader{
+		Type: SectionTypeTXL,
+		Size: 0,
+	}
+
+	txl := TXL{
+		NumOfTPL: uint16(len(data.TXL.TPLName)),
+		Unknown:  0,
+	}
+
+	offset := len(data.TXL.TPLName) * 8
+	offsets := make([]TPLOffSet, len(data.TXL.TPLName))
+	for i, _ := range data.TXL.TPLName {
+		if i != 0 {
+			offset += len(data.TXL.TPLName[i-1]) + 1
+		}
+
+		tplOffset := TPLOffSet{
+			Offset:  uint32(offset),
+			Padding: 0,
+		}
+
+		offsets[i] = tplOffset
+	}
+
+	for _, s := range data.TXL.TPLName {
+		_, err := sectionWriter.WriteString(s)
+		if err != nil {
+			panic(err)
+		}
+
+		// Write null terminator
+		_, _ = sectionWriter.Write([]byte{0})
+	}
+
+	for (b.Len()+sectionWriter.Len())%4 != 0 {
+		_, _ = sectionWriter.Write([]byte{0})
+	}
+
+	header.Size = uint32(12 + (8 * len(data.TXL.TPLName)) + sectionWriter.Len())
+
+	write(b, header)
+	write(b, txl)
+	write(b, offsets)
+	write(b, sectionWriter.Bytes())
+}

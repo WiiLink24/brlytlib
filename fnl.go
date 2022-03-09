@@ -59,3 +59,29 @@ func (r *Root) ParseFNL(data []byte, sectionSize uint32) {
 
 	r.FNL = &FNLNames{FNLName: fontNames}
 }
+
+func (b *BRLYTWriter) WriteFNL(data Root) {
+	// TODO: Write the number of fonts instead of 1. I have observed that there is only 1 fnl section so I am writing only 1.
+
+	header := SectionHeader{
+		Type: SectionTypeFNL,
+		Size: uint32(21 + len(data.FNL.FNLName[0])),
+	}
+
+	meta := FNL{NumOfFonts: 1}
+
+	table := FNLTable{Offset: 8}
+
+	write(b, header)
+	write(b, meta)
+	write(b, table)
+
+	_, err := b.WriteString(data.FNL.FNLName[0])
+	if err != nil {
+		panic(err)
+	}
+
+	// Write null terminator
+	_, _ = b.Write([]byte{0})
+
+}

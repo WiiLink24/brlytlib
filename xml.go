@@ -128,6 +128,8 @@ type XMLTXT struct {
 	Width           float32 `xml:"width"`
 	Height          float32 `xml:"height"`
 	MaxStringLength uint16  `xml:"max_string_length"`
+	MatIndex        uint16  `xml:"matIndex"`
+	TextAlignment   uint8   `xml:"textAlignment"`
 	XSize           float32 `xml:"x_size"`
 	YSize           float32 `xml:"y_size"`
 	CharSize        float32 `xml:"charsize"`
@@ -190,17 +192,102 @@ type MATNode struct {
 }
 
 type MATEntries struct {
-	Name      string        `xml:"name,attr"`
-	ForeColor Color16       `xml:"foreColor"`
-	BackColor Color16       `xml:"backColor"`
-	ColorReg3 Color16       `xml:"colorReg3"`
-	TevColor1 Color8        `xml:"tevColor1"`
-	TevColor2 Color8        `xml:"tevColor2"`
-	TevColor3 Color8        `xml:"tevColor3"`
-	TevColor4 Color8        `xml:"tevColor4"`
-	Textures  []MATTexture  `xml:"texture"`
-	SRT       []MATSRT      `xml:"textureSRT"`
-	CoordGen  []MATCoordGen `xml:"coordGen"`
+	Name                 string                     `xml:"name,attr"`
+	ForeColor            Color16                    `xml:"foreColor"`
+	BackColor            Color16                    `xml:"backColor"`
+	ColorReg3            Color16                    `xml:"colorReg3"`
+	TevColor1            Color8                     `xml:"tevColor1"`
+	TevColor2            Color8                     `xml:"tevColor2"`
+	TevColor3            Color8                     `xml:"tevColor3"`
+	TevColor4            Color8                     `xml:"tevColor4"`
+	BitFlag              uint32                     `xml:"bitFlag"`
+	Textures             []MATTexture               `xml:"texture"`
+	SRT                  []MATSRT                   `xml:"textureSRT"`
+	CoordGen             []MATCoordGen              `xml:"coordGen"`
+	ChanControl          *ChanControlXML            `xml:"chanControl"`
+	MatColor             *Color8                    `xml:"matColor"`
+	TevSwapMode          *TevSwapModeTableXML       `xml:"tevSwapMode"`
+	IndirectSRT          []MATSRT                   `xml:"indirectSRT"`
+	IndirectTextureOrder []MATIndirectOrderEntryXML `xml:"indirectTextureOrder"`
+	TevStageEntry        []MATTevStageEntryXML      `xml:"tevStageEntry"`
+	AlphaCompare         *MATAlphaCompareXML        `xml:"alphaCompare"`
+	BlendMode            *MATBlendMode              `xml:"blendMode"`
+}
+
+type MATBlendMode struct {
+	Type        uint8 `xml:"type"`
+	Source      uint8 `xml:"source"`
+	Destination uint8 `xml:"destination"`
+	Operator    uint8 `xml:"operator"`
+}
+
+type MATAlphaCompareXML struct {
+	Comp0   uint8 `xml:"comp0"`
+	Comp1   uint8 `xml:"comp1"`
+	AlphaOP uint8 `xml:"alphaOP"`
+	Ref0    uint8 `xml:"ref0"`
+	Ref1    uint8 `xml:"ref1"`
+}
+
+type MATTevStageEntryXML struct {
+	TexCoor          uint8  `xml:"texCoor"`
+	Color            uint8  `xml:"color"`
+	TexMap           uint16 `xml:"texMap"`
+	RasSel           uint8  `xml:"rasSel"`
+	TexSel           uint8  `xml:"texSel"`
+	ColorA           uint8  `xml:"colorA"`
+	ColorB           uint8  `xml:"colorB"`
+	ColorC           uint8  `xml:"colorC"`
+	ColorD           uint8  `xml:"colorD"`
+	ColorOP          uint8  `xml:"colorOP"`
+	ColorBias        uint8  `xml:"colorBias"`
+	ColorScale       uint8  `xml:"colorScale"`
+	ColorClamp       uint8  `xml:"colorClamp"`
+	ColorRegID       uint8  `xml:"colorRegID"`
+	ColorConstantSel uint8  `xml:"colorConstantSel"`
+	AlphaA           uint8  `xml:"alphaA"`
+	AlphaB           uint8  `xml:"alphaB"`
+	AlphaC           uint8  `xml:"alphaC"`
+	AlphaD           uint8  `xml:"alphaD"`
+	AlphaOP          uint8  `xml:"alphaOP"`
+	AlphaBias        uint8  `xml:"alphaBias"`
+	AlphaScale       uint8  `xml:"alphaScale"`
+	AlphaClamp       uint8  `xml:"alphaClamp"`
+	AlphaRegID       uint8  `xml:"alphaRegID"`
+	AlphaConstantSel uint8  `xml:"alphaConstantSel"`
+	TexID            uint8  `xml:"texID"`
+	Bias             uint8  `xml:"bias"`
+	Matrix           uint8  `xml:"matrix"`
+	WrapS            uint8  `xml:"wrapS"`
+	WrapT            uint8  `xml:"wrapT"`
+	Format           uint8  `xml:"format"`
+	AddPrevious      uint8  `xml:"addPrevious"`
+	UTCLod           uint8  `xml:"utcLod"`
+	Alpha            uint8  `xml:"alpha"`
+}
+
+type TevSwapModeTableXML struct {
+	AR uint8
+	AG uint8
+	AB uint8
+	AA uint8
+	BR uint8
+	BG uint8
+	BB uint8
+	BA uint8
+	CR uint8
+	CG uint8
+	CB uint8
+	CA uint8
+	DR uint8
+	DG uint8
+	DB uint8
+	DA uint8
+}
+
+type ChanControlXML struct {
+	ColorMaterialSource uint8
+	AlphaMaterialSource uint8
 }
 
 type MATTexture struct {
@@ -215,6 +302,13 @@ type MATSRT struct {
 	Rotation float32 `xml:"Rotation"`
 	XScale   float32 `xml:"XScale"`
 	YScale   float32 `xml:"YScale"`
+}
+
+type MATIndirectOrderEntryXML struct {
+	TexCoord uint8 `xml:"texCoord"`
+	TexMap   uint8 `xml:"texMap"`
+	ScaleS   uint8 `xml:"scaleS"`
+	ScaleT   uint8 `xml:"scaleT"`
 }
 
 type MATCoordGen struct {

@@ -42,7 +42,7 @@ func (r *Root) ParsePAN(data []byte) {
 		UserData:   userData,
 		Visible:    pane.Flag & 0x1,
 		Widescreen: (pane.Flag & 0x2) >> 1,
-		Flag:       (pane.Flag & 0x4) >> 2,
+		Flag:       pane.Flag,
 		Origin:     Coord2D{X: float32(pane.Origin % 3), Y: float32(pane.Origin / 3)},
 		Alpha:      pane.Alpha,
 		Padding:    0,
@@ -73,7 +73,6 @@ func (r *Root) ParseBND(data []byte) {
 		UserData:   userData,
 		Visible:    pane.Flag & 0x1,
 		Widescreen: (pane.Flag & 0x2) >> 1,
-		Flag:       (pane.Flag & 0x4) >> 2,
 		Origin:     Coord2D{X: float32(pane.Origin % 3), Y: float32(pane.Origin / 3)},
 		Alpha:      pane.Alpha,
 		Padding:    0,
@@ -97,4 +96,88 @@ func (r *Root) ParsePAE() {
 	r.Panes = append(r.Panes, Children{
 		PAE: &XMLPAE{},
 	})
+}
+
+func (b *BRLYTWriter) WritePane(pan XMLPane) {
+	header := SectionHeader{
+		Type: SectionTypePAN,
+		Size: 76,
+	}
+	var name [16]byte
+	copy(name[:], pan.Name)
+
+	var userData [8]byte
+	copy(userData[:], pan.UserData)
+
+	pane := Pane{
+		Flag:         pan.Flag,
+		Origin:       uint8(pan.Origin.X + (pan.Origin.Y * 3)),
+		Alpha:        pan.Alpha,
+		PaneName:     name,
+		UserData:     userData,
+		XTranslation: pan.Translate.X,
+		YTranslation: pan.Translate.Y,
+		ZTranslation: pan.Translate.Z,
+		XRotate:      pan.Rotate.X,
+		YRotate:      pan.Rotate.Y,
+		ZRotate:      pan.Rotate.Z,
+		XScale:       pan.Scale.X,
+		YScale:       pan.Scale.Y,
+		Width:        pan.Width,
+		Height:       pan.Height,
+	}
+
+	write(b, header)
+	write(b, pane)
+}
+
+func (b *BRLYTWriter) WriteBND(pan XMLBND) {
+	header := SectionHeader{
+		Type: SectionTypeBND,
+		Size: 76,
+	}
+	var name [16]byte
+	copy(name[:], pan.Name)
+
+	var userData [8]byte
+	copy(userData[:], pan.UserData)
+
+	pane := Pane{
+		Flag:         pan.Flag,
+		Origin:       uint8(pan.Origin.X + (pan.Origin.Y * 3)),
+		Alpha:        pan.Alpha,
+		PaneName:     name,
+		UserData:     userData,
+		XTranslation: pan.Translate.X,
+		YTranslation: pan.Translate.Y,
+		ZTranslation: pan.Translate.Z,
+		XRotate:      pan.Rotate.X,
+		YRotate:      pan.Rotate.Y,
+		ZRotate:      pan.Rotate.Z,
+		XScale:       pan.Scale.X,
+		YScale:       pan.Scale.Y,
+		Width:        pan.Width,
+		Height:       pan.Height,
+	}
+
+	write(b, header)
+	write(b, pane)
+}
+
+func (b *BRLYTWriter) WritePAS() {
+	header := SectionHeader{
+		Type: SectionTypePAS,
+		Size: 8,
+	}
+
+	write(b, header)
+}
+
+func (b *BRLYTWriter) WritePAE() {
+	header := SectionHeader{
+		Type: SectionTypePAE,
+		Size: 8,
+	}
+
+	write(b, header)
 }
