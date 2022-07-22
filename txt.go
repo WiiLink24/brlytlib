@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"strings"
 	"unicode/utf16"
+	"unicode/utf8"
 )
 
 const PlaceHolderString = "==== THIS IS PLACEHOLDER TEXT PLEASE DO NOT TRANSLATE ===="
@@ -130,10 +131,10 @@ func (b *BRLYTWriter) WriteTXT(txt XMLTXT) {
 	text := strings.Replace(txt.Text, "\\n", "\n", -1)
 	encodedText := utf16.Encode([]rune(text))
 
-	textLength := len(txt.Text)*2 + 2
-	if txt.Text == "灡攱" {
-		// For some reason Go recognizes this string as 4 characters when in reality it is 2.
-		textLength = 6
+	textLength := utf8.RuneCountInString(txt.Text) * 2
+
+	if strings.Contains(txt.Text, "%") {
+		textLength = 258
 	}
 
 	pane := TXT{
@@ -179,6 +180,7 @@ func (b *BRLYTWriter) WriteTXT(txt XMLTXT) {
 		pos += 1
 	}
 
+	// If there is no modulo padding, pad with an u32
 	if pos == 0 {
 		write(temp, uint32(0))
 	}
