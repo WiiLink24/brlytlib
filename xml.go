@@ -3,35 +3,31 @@ package main
 import "encoding/xml"
 
 type XMLPane struct {
-	Name       string  `xml:"name,attr"`
-	UserData   string  `xml:"user_data,attr"`
-	Visible    uint8   `xml:"visible"`
-	Widescreen uint8   `xml:"widescreen_affected"`
-	Flag       uint8   `xml:"flag"`
-	Origin     Coord2D `xml:"origin"`
-	Alpha      uint8   `xml:"alpha"`
-	Padding    uint8   `xml:"padding"`
-	Translate  Coord3D `xml:"translate"`
-	Rotate     Coord3D `xml:"rotate"`
-	Scale      Coord2D `xml:"scale"`
-	Width      float32 `xml:"width"`
-	Height     float32 `xml:"height"`
+	Name      string  `xml:"name,attr"`
+	UserData  string  `xml:"user_data,attr"`
+	Flag      uint8   `xml:"flag"`
+	Origin    Coord2D `xml:"origin"`
+	Alpha     uint8   `xml:"alpha"`
+	Padding   uint8   `xml:"padding"`
+	Translate Coord3D `xml:"translate"`
+	Rotate    Coord3D `xml:"rotate"`
+	Scale     Coord2D `xml:"scale"`
+	Width     float32 `xml:"width"`
+	Height    float32 `xml:"height"`
 }
 
 type XMLBND struct {
-	Name       string  `xml:"name,attr"`
-	UserData   string  `xml:"user_data,attr"`
-	Visible    uint8   `xml:"visible"`
-	Widescreen uint8   `xml:"widescreen_affected"`
-	Flag       uint8   `xml:"flag"`
-	Origin     Coord2D `xml:"origin"`
-	Alpha      uint8   `xml:"alpha"`
-	Padding    uint8   `xml:"padding"`
-	Translate  Coord3D `xml:"translate"`
-	Rotate     Coord3D `xml:"rotate"`
-	Scale      Coord2D `xml:"scale"`
-	Width      float32 `xml:"width"`
-	Height     float32 `xml:"height"`
+	Name      string  `xml:"name,attr"`
+	UserData  string  `xml:"user_data,attr"`
+	Flag      uint8   `xml:"flag"`
+	Origin    Coord2D `xml:"origin"`
+	Alpha     uint8   `xml:"alpha"`
+	Padding   uint8   `xml:"padding"`
+	Translate Coord3D `xml:"translate"`
+	Rotate    Coord3D `xml:"rotate"`
+	Scale     Coord2D `xml:"scale"`
+	Width     float32 `xml:"width"`
+	Height    float32 `xml:"height"`
 }
 
 type XMLPIC struct {
