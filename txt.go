@@ -3,9 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"strings"
 	"unicode/utf16"
-	"unicode/utf8"
 )
 
 const PlaceHolderString = "==== THIS IS PLACEHOLDER TEXT PLEASE DO NOT TRANSLATE ===="
@@ -70,6 +70,7 @@ func (r *Root) ParseTXT(data []byte, sectionSize uint32) {
 
 	// Strip null bytes
 	decodedString := strings.Replace(string(utf16.Decode(full)), "\x00", "", -1)
+	fmt.Println(len(decodedString))
 
 	if decodedString == "あああああああああああああああああああ" {
 		decodedString = PlaceHolderString
@@ -131,11 +132,7 @@ func (b *BRLYTWriter) WriteTXT(txt XMLTXT) {
 	text := strings.Replace(txt.Text, "\\n", "\n", -1)
 	encodedText := utf16.Encode([]rune(text))
 
-	textLength := utf8.RuneCountInString(txt.Text) * 2
-
-	if strings.Contains(txt.Text, "%") {
-		textLength = 258
-	}
+	textLength := len(encodedText)*2 + 2
 
 	pane := TXT{
 		Flag:            txt.Flag,
@@ -173,10 +170,7 @@ func (b *BRLYTWriter) WriteTXT(txt XMLTXT) {
 
 	pos := 0
 	for (b.Len()+temp.Len())%4 != 0 {
-		_, err := temp.Write([]byte{0})
-		if err != nil {
-			panic(err)
-		}
+		temp.WriteByte(0)
 		pos += 1
 	}
 
