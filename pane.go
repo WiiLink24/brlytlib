@@ -1,36 +1,17 @@
-package main
+package brlyt
 
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
 	"strings"
 )
 
-// Pane represents the structure of a pan1 section.
-type Pane struct {
-	Flag         uint8
-	Origin       uint8
-	Alpha        uint8
-	_            uint8
-	PaneName     [16]byte
-	UserData     [8]byte
-	XTranslation float32
-	YTranslation float32
-	ZTranslation float32
-	XRotate      float32
-	YRotate      float32
-	ZRotate      float32
-	XScale       float32
-	YScale       float32
-	Width        float32
-	Height       float32
-}
-
-func (r *Root) ParsePAN(data []byte) {
+func (r *Root) ParsePAN(data []byte) (*XMLPane, error) {
 	var pane Pane
 	err := binary.Read(bytes.NewReader(data), binary.BigEndian, &pane)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	// Strip the null bytes from the strings
@@ -51,22 +32,44 @@ func (r *Root) ParsePAN(data []byte) {
 		Height:    pane.Height,
 	}
 
-	r.Panes = append(r.Panes, Children{Pane: &xmlData})
+	if name == "RootPane" {
+		r.RootPane = xmlData
+		r.count--
+
+		_, err = r.reader.Seek(8, io.SeekCurrent)
+		if err != nil {
+			return nil, err
+		}
+
+		r.RootPane.Children, err = r.ParseChildren()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Only the Root Pane is guaranteed to have children, peek to see if this pane does.
+		if r.HasChildren() {
+			xmlData.Children, err = r.ParseChildren()
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return &xmlData, nil
 }
 
-// ParseBND is almost 1:1 with ParsePAN as PAN and BND are the same types.
-func (r *Root) ParseBND(data []byte) {
+func (r *Root) ParseBND(data []byte) (*XMLPane, error) {
 	var pane Pane
 	err := binary.Read(bytes.NewReader(data), binary.BigEndian, &pane)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	// Strip the null bytes from the strings
 	name := strings.Replace(string(pane.PaneName[:]), "\x00", "", -1)
 	userData := strings.Replace(string(pane.UserData[:]), "\x00", "", -1)
 
-	xmlData := XMLBND{
+	xmlData := XMLPane{
 		Name:      name,
 		UserData:  userData,
 		Flag:      pane.Flag,
@@ -80,22 +83,17 @@ func (r *Root) ParseBND(data []byte) {
 		Height:    pane.Height,
 	}
 
-	r.Panes = append(r.Panes, Children{BND: &xmlData})
+	if r.HasChildren() {
+		xmlData.Children, err = r.ParseChildren()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &xmlData, nil
 }
 
-func (r *Root) ParsePAS() {
-	r.Panes = append(r.Panes, Children{
-		PAS: &XMLPAS{},
-	})
-}
-
-func (r *Root) ParsePAE() {
-	r.Panes = append(r.Panes, Children{
-		PAE: &XMLPAE{},
-	})
-}
-
-func (b *BRLYTWriter) WritePane(pan XMLPane) {
+func (b *BRLYTWriter) WritePane(pan XMLPane) error {
 	header := SectionHeader{
 		Type: SectionTypePAN,
 		Size: 76,
@@ -124,11 +122,15 @@ func (b *BRLYTWriter) WritePane(pan XMLPane) {
 		Height:       pan.Height,
 	}
 
-	write(b, header)
-	write(b, pane)
+	err := write(b, header)
+	if err != nil {
+		return err
+	}
+
+	return write(b, pane)
 }
 
-func (b *BRLYTWriter) WriteBND(pan XMLBND) {
+func (b *BRLYTWriter) WriteBND(pan XMLPane) error {
 	header := SectionHeader{
 		Type: SectionTypeBND,
 		Size: 76,
@@ -157,24 +159,28 @@ func (b *BRLYTWriter) WriteBND(pan XMLBND) {
 		Height:       pan.Height,
 	}
 
-	write(b, header)
-	write(b, pane)
+	err := write(b, header)
+	if err != nil {
+		return err
+	}
+
+	return write(b, pane)
 }
 
-func (b *BRLYTWriter) WritePAS() {
+func (b *BRLYTWriter) WritePAS() error {
 	header := SectionHeader{
 		Type: SectionTypePAS,
 		Size: 8,
 	}
 
-	write(b, header)
+	return write(b, header)
 }
 
-func (b *BRLYTWriter) WritePAE() {
+func (b *BRLYTWriter) WritePAE() error {
 	header := SectionHeader{
 		Type: SectionTypePAE,
 		Size: 8,
 	}
 
-	write(b, header)
+	return write(b, header)
 }

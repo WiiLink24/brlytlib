@@ -1,11 +1,10 @@
-package main
+package brlyt
 
 import (
 	"bytes"
 	"encoding/binary"
 	"encoding/xml"
 	"io"
-	"io/ioutil"
 )
 
 // Header represents the header of our BRLYT
@@ -36,6 +35,8 @@ var (
 	SectionTypeGRP SectionTypes = [4]byte{'g', 'r', 'p', '1'}
 	SectionTypeGRS SectionTypes = [4]byte{'g', 'r', 's', '1'}
 	SectionTypeGRE SectionTypes = [4]byte{'g', 'r', 'e', '1'}
+
+	sectionCount = 0
 )
 
 type SectionHeader struct {
@@ -47,19 +48,13 @@ type BRLYTWriter struct {
 	*bytes.Buffer
 }
 
-func ParseBRLYT(fileName string) ([]byte, error) {
-	contents, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		panic(err)
-	}
-
-	// Create a new reader
+func ParseBRLYT(contents []byte) (*Root, error) {
 	readable := bytes.NewReader(contents)
 
 	var header Header
-	err = binary.Read(readable, binary.BigEndian, &header)
+	err := binary.Read(readable, binary.BigEndian, &header)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	if !bytes.Equal(headerMagic[:], header.Magic[:]) {
@@ -75,10 +70,10 @@ func ParseBRLYT(fileName string) ([]byte, error) {
 		LYT:     LYTNode{},
 		FNL:     nil,
 		TXL:     nil,
-		Panes:   nil,
+		reader:  readable,
 	}
 
-	for count := header.SectionCount; count != 0; count-- {
+	for root.count = header.SectionCount; root.count != 0; root.count-- {
 		var sectionHeader SectionHeader
 		err = binary.Read(readable, binary.BigEndian, &sectionHeader)
 		if err != nil {
@@ -87,17 +82,6 @@ func ParseBRLYT(fileName string) ([]byte, error) {
 
 		// Subtract the header size
 		sectionSize := int(sectionHeader.Size) - 8
-		if readable.Len() == 0 {
-			// If our type is one of the section ending types, we can write then finish.
-			switch sectionHeader.Type {
-			case SectionTypePAE:
-				root.ParsePAE()
-			case SectionTypeGRE:
-				root.ParseGRE()
-			}
-			continue
-		}
-
 		temp := make([]byte, sectionSize)
 		_, err = readable.Read(temp)
 		if err != nil {
@@ -106,42 +90,40 @@ func ParseBRLYT(fileName string) ([]byte, error) {
 
 		switch sectionHeader.Type {
 		case SectionTypeLYT:
-			root.ParseLYT(temp)
+			err = root.ParseLYT(temp)
+			if err != nil {
+				return nil, err
+			}
 		case SectionTypeTXL:
-			root.ParseTXL(temp, sectionHeader.Size)
+			err = root.ParseTXL(temp, sectionHeader.Size)
+			if err != nil {
+				return nil, err
+			}
 		case SectionTypeFNL:
-			root.ParseFNL(temp, sectionHeader.Size)
+			err = root.ParseFNL(temp, sectionHeader.Size)
+			if err != nil {
+				return nil, err
+			}
 		case SectionTypeMAT:
-			root.ParseMAT(temp, sectionHeader.Size)
+			err = root.ParseMAT(temp, sectionHeader.Size)
+			if err != nil {
+				return nil, err
+			}
 		case SectionTypePAN:
-			root.ParsePAN(temp)
-		case SectionTypeBND:
-			root.ParseBND(temp)
-		case SectionTypePIC:
-			root.ParsePIC(temp)
-		case SectionTypeTXT:
-			root.ParseTXT(temp, sectionHeader.Size)
-		case SectionTypeWND:
-			root.ParseWND(temp)
-		case SectionTypePAS:
-			root.ParsePAS()
-		case SectionTypePAE:
-			root.ParsePAE()
+			// Root Pane is guaranteed to exist. We will sequentially read from it.
+			_, err = root.ParsePAN(temp)
+			if err != nil {
+				return nil, err
+			}
 		case SectionTypeGRP:
-			root.ParseGRP(temp)
-		case SectionTypeGRS:
-			root.ParseGRS()
-		case SectionTypeGRE:
-			root.ParseGRE()
+			_, err = root.ParseGRP(temp)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	data, err := xml.MarshalIndent(root, "", "\t")
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
+	return &root, nil
 }
 
 func WriteBRLYT(data []byte) ([]byte, error) {
@@ -167,61 +149,68 @@ func WriteBRLYT(data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	sectionCount := len(root.Panes)
+	sectionCount = 0
 
 	// Write the LYT1 section
-	writer.WriteLYT(root)
-	sectionCount += 1
+	err = writer.WriteLYT(root)
+	if err != nil {
+		return nil, err
+	}
+	sectionCount++
 
 	if root.TXL != nil {
 		// Write TXL section
-		writer.WriteTXL(root)
-		sectionCount += 1
+		err = writer.WriteTXL(root)
+		if err != nil {
+			return nil, err
+		}
+
+		sectionCount++
 	}
 
 	if root.FNL != nil {
 		// Write FNL section
-		writer.WriteFNL(root)
-		sectionCount += 1
+		err = writer.WriteFNL(root)
+		if err != nil {
+			return nil, err
+		}
+
+		sectionCount++
 	}
 
 	// Write MAT section
-	writer.WriteMAT(root)
-	sectionCount += 1
-
-	for _, pane := range root.Panes {
-		// Please bear with me, we must check which pane is not nil
-		if pane.Pane != nil {
-			writer.WritePane(*pane.Pane)
-		}
-		if pane.PAS != nil {
-			writer.WritePAS()
-		}
-		if pane.PAE != nil {
-			writer.WritePAE()
-		}
-		if pane.BND != nil {
-			writer.WriteBND(*pane.BND)
-		}
-		if pane.PIC != nil {
-			writer.WritePIC(*pane.PIC)
-		}
-		if pane.TXT != nil {
-			writer.WriteTXT(*pane.TXT)
-		}
-		if pane.WND != nil {
-			writer.WriteWND(*pane.WND)
-		}
-		if pane.GRP != nil {
-			writer.WriteGRP(*pane.GRP)
-		}
-		if pane.GRS != nil {
-			writer.WriteGRS()
-		}
-		if pane.GRE != nil {
-			writer.WriteGRE()
-		}
+	err = writer.WriteMAT(root)
+	if err != nil {
+		return nil, err
 	}
+
+	sectionCount++
+
+	// Write RootPane then children
+	err = writer.WritePane(root.RootPane)
+	if err != nil {
+		return nil, err
+	}
+
+	err = writer.WriteChildren(root.RootPane.Children)
+	if err != nil {
+		return nil, err
+	}
+
+	sectionCount++
+
+	// Same with RootGroup.
+	err = writer.WriteGRP(root.RootGroup)
+	if err != nil {
+		return nil, err
+	}
+
+	err = writer.WriteGroupChildren(root.RootGroup.Children)
+	if err != nil {
+		return nil, err
+	}
+
+	sectionCount++
 
 	binary.BigEndian.PutUint32(writer.Bytes()[8:12], uint32(writer.Len()))
 	binary.BigEndian.PutUint16(writer.Bytes()[14:16], uint16(sectionCount))
@@ -229,9 +218,126 @@ func WriteBRLYT(data []byte) ([]byte, error) {
 	return writer.Bytes(), nil
 }
 
-func write(writer io.Writer, data interface{}) {
-	err := binary.Write(writer, binary.BigEndian, data)
-	if err != nil {
-		panic(err)
+func (b *BRLYTWriter) WriteGroupChildren(children []Children) error {
+	if children == nil {
+		return nil
 	}
+
+	err := b.WriteGRS()
+	if err != nil {
+		return err
+	}
+
+	sectionCount++
+
+	for _, child := range children {
+		if child.GRP != nil {
+			err = b.WriteGRP(*child.GRP)
+			if err != nil {
+				return err
+			}
+
+			err = b.WriteChildren(child.GRP.Children)
+			if err != nil {
+				return err
+			}
+		}
+
+		sectionCount++
+	}
+
+	err = b.WriteGRE()
+	if err != nil {
+		return err
+	}
+
+	sectionCount++
+	return nil
+}
+
+func (b *BRLYTWriter) WriteChildren(children []Children) error {
+	if children == nil {
+		return nil
+	}
+
+	// Write pane start
+	err := b.WritePAS()
+	if err != nil {
+		return err
+	}
+
+	sectionCount++
+
+	for _, child := range children {
+		if child.Pane != nil {
+			err = b.WritePane(*child.Pane)
+			if err != nil {
+				return err
+			}
+
+			err = b.WriteChildren(child.Pane.Children)
+			if err != nil {
+				return err
+			}
+		}
+		if child.BND != nil {
+			err = b.WriteBND(*child.BND)
+			if err != nil {
+				return err
+			}
+
+			err = b.WriteChildren(child.BND.Children)
+			if err != nil {
+				return err
+			}
+		}
+		if child.PIC != nil {
+			err = b.WritePIC(*child.PIC)
+			if err != nil {
+				return err
+			}
+
+			err = b.WriteChildren(child.PIC.Children)
+			if err != nil {
+				return err
+			}
+		}
+		if child.TXT != nil {
+			err = b.WriteTXT(*child.TXT)
+			if err != nil {
+				return err
+			}
+
+			err = b.WriteChildren(child.TXT.Children)
+			if err != nil {
+				return err
+			}
+		}
+		if child.WND != nil {
+			err = b.WriteWND(*child.WND)
+			if err != nil {
+				return err
+			}
+
+			err = b.WriteChildren(child.WND.Children)
+			if err != nil {
+				return err
+			}
+		}
+
+		sectionCount++
+	}
+
+	// End this pane
+	err = b.WritePAE()
+	if err != nil {
+		return err
+	}
+
+	sectionCount++
+	return nil
+}
+
+func write(writer io.Writer, data any) error {
+	return binary.Write(writer, binary.BigEndian, data)
 }

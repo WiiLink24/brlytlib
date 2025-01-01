@@ -1,4 +1,4 @@
-package main
+package brlyt
 
 import (
 	"bytes"
@@ -6,50 +6,12 @@ import (
 	"strings"
 )
 
-// PIC defines the image pane in a brlyt
-type PIC struct {
-	Flag             uint8
-	Origin           uint8
-	Alpha            uint8
-	_                uint8
-	PaneName         [16]byte
-	UserData         [8]byte
-	XTranslation     float32
-	YTranslation     float32
-	ZTranslation     float32
-	XRotate          float32
-	YRotate          float32
-	ZRotate          float32
-	XScale           float32
-	YScale           float32
-	Width            float32
-	Height           float32
-	TopLeftColor     [4]uint8
-	TopRightColor    [4]uint8
-	BottomLeftColor  [4]uint8
-	BottomRightColor [4]uint8
-	MatIndex         uint16
-	NumOfUVSets      uint8
-	_                uint8
-}
-
-type UVSet struct {
-	TopLeftS     float32
-	TopLeftT     float32
-	TopRightS    float32
-	TopRightT    float32
-	BottomLeftS  float32
-	BottomLeftT  float32
-	BottomRightS float32
-	BottomRightT float32
-}
-
-func (r *Root) ParsePIC(data []byte) {
+func (r *Root) ParsePIC(data []byte) (*XMLPIC, error) {
 
 	var pic PIC
 	err := binary.Read(bytes.NewReader(data), binary.BigEndian, &pic)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	// Strip the null bytes from the strings
@@ -62,9 +24,9 @@ func (r *Root) ParsePIC(data []byte) {
 		offset := 88 + (i * 32)
 
 		var uv UVSet
-		err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &uv)
+		err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &uv)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 
 		set := XMLUVSet{
@@ -131,10 +93,17 @@ func (r *Root) ParsePIC(data []byte) {
 		UVSets:   &XMLUVSets{Set: uvSets},
 	}
 
-	r.Panes = append(r.Panes, Children{PIC: &xmlData})
+	if r.HasChildren() {
+		xmlData.Children, err = r.ParseChildren()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &xmlData, nil
 }
 
-func (b *BRLYTWriter) WritePIC(pic XMLPIC) {
+func (b *BRLYTWriter) WritePIC(pic XMLPIC) error {
 	header := SectionHeader{
 		Type: SectionTypePIC,
 		Size: uint32(96 + (32 * len(pic.UVSets.Set))),
@@ -169,8 +138,15 @@ func (b *BRLYTWriter) WritePIC(pic XMLPIC) {
 		NumOfUVSets:      uint8(len(pic.UVSets.Set)),
 	}
 
-	write(b, header)
-	write(b, pane)
+	err := write(b, header)
+	if err != nil {
+		return err
+	}
+
+	err = write(b, pane)
+	if err != nil {
+		return err
+	}
 
 	// Write the UV Sets
 	for _, set := range pic.UVSets.Set {
@@ -185,6 +161,11 @@ func (b *BRLYTWriter) WritePIC(pic XMLPIC) {
 			BottomRightT: set.CoordBR.T,
 		}
 
-		write(b, uvSet)
+		err = write(b, uvSet)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }

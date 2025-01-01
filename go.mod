@@ -1,3 +1,3 @@
-module github.com/WiiLink24/brlytlib
+module "github.com/WiiLink24/brlytlib"
 
-go 1.17
+go 1.22

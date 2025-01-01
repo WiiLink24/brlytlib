@@ -1,4 +1,4 @@
-package main
+package brlyt
 
 import (
 	"bytes"
@@ -18,14 +18,14 @@ type FNLTable struct {
 	_      uint32
 }
 
-func (r *Root) ParseFNL(data []byte, sectionSize uint32) {
+func (r *Root) ParseFNL(data []byte, sectionSize uint32) error {
 	var fontOffsets []uint32
 	var fontNames []string
 
 	var fnl FNL
 	err := binary.Read(bytes.NewReader(data), binary.BigEndian, &fnl)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	for i := 0; i < int(fnl.NumOfFonts); i++ {
@@ -36,7 +36,7 @@ func (r *Root) ParseFNL(data []byte, sectionSize uint32) {
 
 		err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &fnlTable)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		fontOffsets = append(fontOffsets, fnlTable.Offset+4)
@@ -58,9 +58,10 @@ func (r *Root) ParseFNL(data []byte, sectionSize uint32) {
 	}
 
 	r.FNL = &FNLNames{FNLName: fontNames}
+	return nil
 }
 
-func (b *BRLYTWriter) WriteFNL(data Root) {
+func (b *BRLYTWriter) WriteFNL(data Root) error {
 	// TODO: Write the number of fonts instead of 1. I have observed that there is only 1 fnl section so I am writing only 1.
 	temp := bytes.NewBuffer(nil)
 
@@ -73,13 +74,24 @@ func (b *BRLYTWriter) WriteFNL(data Root) {
 
 	table := FNLTable{Offset: 8}
 
-	write(temp, header)
-	write(temp, meta)
-	write(temp, table)
-
-	_, err := temp.WriteString(data.FNL.FNLName[0])
+	err := write(temp, header)
 	if err != nil {
-		panic(err)
+		return err
+	}
+
+	err = write(temp, meta)
+	if err != nil {
+		return err
+	}
+
+	err = write(temp, table)
+	if err != nil {
+		return err
+	}
+
+	_, err = temp.WriteString(data.FNL.FNLName[0])
+	if err != nil {
+		return err
 	}
 
 	// Write null terminator
@@ -90,5 +102,5 @@ func (b *BRLYTWriter) WriteFNL(data Root) {
 	}
 
 	binary.BigEndian.PutUint32(temp.Bytes()[4:8], uint32(temp.Len()))
-	write(b, temp.Bytes())
+	return write(b, temp.Bytes())
 }

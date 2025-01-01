@@ -1,4 +1,4 @@
-package main
+package brlyt
 
 import (
 	"bytes"
@@ -17,14 +17,14 @@ type TPLOffSet struct {
 	Padding uint32
 }
 
-func (r *Root) ParseTXL(data []byte, sectionSize uint32) {
+func (r *Root) ParseTXL(data []byte, sectionSize uint32) error {
 	var tplOffsets []uint32
 	var tplNames []string
 
 	var txl TXL
 	err := binary.Read(bytes.NewReader(data), binary.BigEndian, &txl)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	for i := 0; i < int(txl.NumOfTPL); i++ {
@@ -35,7 +35,7 @@ func (r *Root) ParseTXL(data []byte, sectionSize uint32) {
 
 		err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &tplTable)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		tplOffsets = append(tplOffsets, tplTable.Offset+4)
@@ -57,9 +57,10 @@ func (r *Root) ParseTXL(data []byte, sectionSize uint32) {
 	}
 
 	r.TXL = &TPLNames{TPLName: tplNames}
+	return nil
 }
 
-func (b *BRLYTWriter) WriteTXL(data Root) {
+func (b *BRLYTWriter) WriteTXL(data Root) error {
 	sectionWriter := bytes.NewBuffer(nil)
 
 	header := SectionHeader{
@@ -90,7 +91,7 @@ func (b *BRLYTWriter) WriteTXL(data Root) {
 	for _, s := range data.TXL.TPLName {
 		_, err := sectionWriter.WriteString(s)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		// Write null terminator
@@ -103,8 +104,20 @@ func (b *BRLYTWriter) WriteTXL(data Root) {
 
 	header.Size = uint32(12 + (8 * len(data.TXL.TPLName)) + sectionWriter.Len())
 
-	write(b, header)
-	write(b, txl)
-	write(b, offsets)
-	write(b, sectionWriter.Bytes())
+	err := write(b, header)
+	if err != nil {
+		return err
+	}
+
+	err = write(b, txl)
+	if err != nil {
+		return err
+	}
+
+	err = write(b, offsets)
+	if err != nil {
+		return err
+	}
+
+	return write(b, sectionWriter.Bytes())
 }

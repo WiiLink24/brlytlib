@@ -1,4 +1,4 @@
-package main
+package brlyt
 
 import (
 	"bytes"
@@ -101,23 +101,23 @@ type MatAlphaCompare struct {
 	Ref1    uint8
 }
 
-func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
+func (r *Root) ParseMAT(data []byte, sectionSize uint32) error {
 	var mat MAT
 	var materialOffsets []uint32
 	var matEntries []MATEntries
 
 	err := binary.Read(bytes.NewReader(data), binary.BigEndian, &mat)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	for i := 0; i < int(mat.NumOfMats); i++ {
 		var matOffset MATOffset
 		offset := 4 + (i * 4)
 
-		err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &matOffset)
+		err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &matOffset)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		materialOffsets = append(materialOffsets, matOffset.Offset-8)
@@ -132,9 +132,9 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 	for i := 0; i < int(mat.NumOfMats); i++ {
 		var matMaterials MATMaterials
 
-		err := binary.Read(bytes.NewReader(data[materialOffsets[i]:materialOffsets[i+1]]), binary.BigEndian, &matMaterials)
+		err = binary.Read(bytes.NewReader(data[materialOffsets[i]:materialOffsets[i+1]]), binary.BigEndian, &matMaterials)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		// Read the bitfield
@@ -144,9 +144,9 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 		for i := 0; i < BitExtract(matMaterials.BitFlag, 28, 31); i++ {
 			var texEntry MATTextureEntry
 
-			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &texEntry)
+			err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &texEntry)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			xmlTexture := MATTexture{
@@ -167,9 +167,9 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 		for i := 0; i < BitExtract(matMaterials.BitFlag, 24, 27); i++ {
 			var texSRTEntry MATTextureSRTEntry
 
-			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &texSRTEntry)
+			err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &texSRTEntry)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			xmlSRT := MATSRT{
@@ -188,9 +188,9 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 		for i := 0; i < BitExtract(matMaterials.BitFlag, 20, 23); i++ {
 			var texCoorGenEntry MATTexCoordGenEntry
 
-			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &texCoorGenEntry)
+			err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &texCoorGenEntry)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			xmlCoorGen := MATCoordGen{
@@ -207,9 +207,9 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 		if BitExtract(matMaterials.BitFlag, 6, 100) == 1 {
 			var chanControl MATChanControl
 
-			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &chanControl)
+			err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &chanControl)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			chanControlXML = &ChanControlXML{
@@ -224,9 +224,9 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 		if BitExtract(matMaterials.BitFlag, 4, 100) == 1 {
 			var matColor MATColor
 
-			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &matColor)
+			err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &matColor)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			matColorXML = &Color8{
@@ -243,9 +243,9 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 		if BitExtract(matMaterials.BitFlag, 19, 100) == 1 {
 			var tevSwapModeTable TevSwapModeTable
 
-			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &tevSwapModeTable)
+			err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &tevSwapModeTable)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			tevSwapModeTableXML = &TevSwapModeTableXML{
@@ -274,9 +274,9 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 		for i := 0; i < BitExtract(matMaterials.BitFlag, 17, 18); i++ {
 			var texSRTEntry MATTextureSRTEntry
 
-			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &texSRTEntry)
+			err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &texSRTEntry)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			xmlSRT := MATSRT{
@@ -295,9 +295,9 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 		for i := 0; i < BitExtract(matMaterials.BitFlag, 14, 16); i++ {
 			var texOrderEntry MATIndirectTextureOrderEntry
 
-			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &texOrderEntry)
+			err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &texOrderEntry)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			xmlEntry := MATIndirectOrderEntryXML{
@@ -315,9 +315,9 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 		for i := 0; i < BitExtract(matMaterials.BitFlag, 9, 13); i++ {
 			var temp MATTevStageEntry
 
-			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &temp)
+			err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &temp)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			colorClamp := 0
@@ -376,9 +376,9 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 		if BitExtract(matMaterials.BitFlag, 8, 8) == 1 {
 			var alphaCompare MatAlphaCompare
 
-			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &alphaCompare)
+			err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &alphaCompare)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			alphaCompareXML = &MATAlphaCompareXML{
@@ -396,9 +396,9 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 		if BitExtract(matMaterials.BitFlag, 7, 7) == 1 {
 			var blendMode MATBlendMode
 
-			err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &blendMode)
+			err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &blendMode)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			blendModeXML = &blendMode
@@ -470,9 +470,10 @@ func (r *Root) ParseMAT(data []byte, sectionSize uint32) {
 	}
 
 	r.MAT = MATNode{Entries: matEntries}
+	return nil
 }
 
-func (b *BRLYTWriter) WriteMAT(data Root) {
+func (b *BRLYTWriter) WriteMAT(data Root) error {
 	temp := bytes.NewBuffer(nil)
 
 	header := SectionHeader{
@@ -506,7 +507,11 @@ func (b *BRLYTWriter) WriteMAT(data Root) {
 			BitFlag:   entry.BitFlag,
 		}
 
-		write(temp, material)
+		err := write(temp, material)
+		if err != nil {
+			return err
+		}
+
 		count += 64
 
 		for _, texture := range entry.Textures {
@@ -518,7 +523,11 @@ func (b *BRLYTWriter) WriteMAT(data Root) {
 						TWrap:    texture.TWrap,
 					}
 
-					write(temp, tex)
+					err = write(temp, tex)
+					if err != nil {
+						return err
+					}
+
 					count += 4
 				}
 			}
@@ -533,7 +542,11 @@ func (b *BRLYTWriter) WriteMAT(data Root) {
 				YScale:   srt.YScale,
 			}
 
-			write(temp, srtEntry)
+			err = write(temp, srtEntry)
+			if err != nil {
+				return err
+			}
+
 			count += 20
 		}
 
@@ -544,7 +557,11 @@ func (b *BRLYTWriter) WriteMAT(data Root) {
 				MatrixSource: gen.MatrixSource,
 			}
 
-			write(temp, coorEntry)
+			err = write(temp, coorEntry)
+			if err != nil {
+				return err
+			}
+
 			count += 4
 		}
 
@@ -554,7 +571,11 @@ func (b *BRLYTWriter) WriteMAT(data Root) {
 				AlphaMaterialSource: entry.ChanControl.AlphaMaterialSource,
 			}
 
-			write(temp, chanControl)
+			err = write(temp, chanControl)
+			if err != nil {
+				return err
+			}
+
 			count += 4
 		}
 
@@ -566,7 +587,11 @@ func (b *BRLYTWriter) WriteMAT(data Root) {
 				A: entry.MatColor.A,
 			}
 
-			write(temp, matColor)
+			err = write(temp, matColor)
+			if err != nil {
+				return err
+			}
+
 			count += 4
 		}
 
@@ -602,7 +627,11 @@ func (b *BRLYTWriter) WriteMAT(data Root) {
 				B4: b4,
 			}
 
-			write(temp, tevSwap)
+			err = write(temp, tevSwap)
+			if err != nil {
+				return err
+			}
+
 			count += 4
 		}
 
@@ -615,7 +644,11 @@ func (b *BRLYTWriter) WriteMAT(data Root) {
 				YScale:   matsrt.YScale,
 			}
 
-			write(temp, srt)
+			err = write(temp, srt)
+			if err != nil {
+				return err
+			}
+
 			count += 20
 		}
 
@@ -627,7 +660,11 @@ func (b *BRLYTWriter) WriteMAT(data Root) {
 				ScaleT:   tex.ScaleT,
 			}
 
-			write(temp, indirectTex)
+			err = write(temp, indirectTex)
+			if err != nil {
+				return err
+			}
+
 			count += 4
 		}
 
@@ -705,7 +742,11 @@ func (b *BRLYTWriter) WriteMAT(data Root) {
 				B12:     B12,
 			}
 
-			write(temp, entry)
+			err = write(temp, entry)
+			if err != nil {
+				return err
+			}
+
 			count += 16
 		}
 
@@ -721,21 +762,41 @@ func (b *BRLYTWriter) WriteMAT(data Root) {
 				Ref1:    entry.AlphaCompare.Ref1,
 			}
 
-			write(temp, entry)
+			err = write(temp, entry)
+			if err != nil {
+				return err
+			}
+
 			count += 4
 		}
 
 		if entry.BlendMode != nil {
-			write(temp, entry.BlendMode)
+			err = write(temp, entry.BlendMode)
+			if err != nil {
+				return err
+			}
+
 			count += 4
 		}
 	}
 
 	header.Size = uint32(count)
-	write(b, header)
-	write(b, meta)
-	write(b, offsets)
-	write(b, temp.Bytes())
+	err := write(b, header)
+	if err != nil {
+		return err
+	}
+
+	err = write(b, meta)
+	if err != nil {
+		return err
+	}
+
+	err = write(b, offsets)
+	if err != nil {
+		return err
+	}
+
+	return write(b, temp.Bytes())
 }
 
 func BitExtract(num uint32, start int, end int) int {

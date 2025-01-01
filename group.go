@@ -1,4 +1,4 @@
-package main
+package brlyt
 
 import (
 	"bytes"
@@ -6,18 +6,12 @@ import (
 	"strings"
 )
 
-type GRP struct {
-	Name         [16]byte
-	NumOfEntries uint16
-	_            uint16
-}
-
-func (r *Root) ParseGRP(data []byte) {
+func (r *Root) ParseGRP(data []byte) (*XMLGRP, error) {
 	var grp GRP
 
 	err := binary.Read(bytes.NewReader(data), binary.BigEndian, &grp)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	// Strip the null bytes from the strings
@@ -37,22 +31,27 @@ func (r *Root) ParseGRP(data []byte) {
 		Entries: entries,
 	}
 
-	r.Panes = append(r.Panes, Children{GRP: &xmlData})
+	if name == "RootGroup" {
+		r.RootGroup = xmlData
+		if r.HasChildren() {
+			r.RootGroup.Children, err = r.ParseChildren()
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		if r.HasChildren() {
+			xmlData.Children, err = r.ParseChildren()
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return &xmlData, nil
 }
 
-func (r *Root) ParseGRS() {
-	r.Panes = append(r.Panes, Children{
-		GRS: &XMLGRS{},
-	})
-}
-
-func (r *Root) ParseGRE() {
-	r.Panes = append(r.Panes, Children{
-		GRE: &XMLGRE{},
-	})
-}
-
-func (b *BRLYTWriter) WriteGRP(data XMLGRP) {
+func (b *BRLYTWriter) WriteGRP(data XMLGRP) error {
 	header := SectionHeader{
 		Type: SectionTypeGRP,
 		Size: uint32(28 + (16 * len(data.Entries))),
@@ -66,31 +65,43 @@ func (b *BRLYTWriter) WriteGRP(data XMLGRP) {
 		NumOfEntries: uint16(len(data.Entries)),
 	}
 
-	write(b, header)
-	write(b, grp)
+	err := write(b, header)
+	if err != nil {
+		return err
+	}
+
+	err = write(b, grp)
+	if err != nil {
+		return err
+	}
 
 	for _, str := range data.Entries {
 		var entry [16]byte
 		copy(entry[:], str)
 
-		write(b, entry)
+		err = write(b, entry)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
-func (b *BRLYTWriter) WriteGRS() {
+func (b *BRLYTWriter) WriteGRS() error {
 	header := SectionHeader{
 		Type: SectionTypeGRS,
 		Size: 8,
 	}
 
-	write(b, header)
+	return write(b, header)
 }
 
-func (b *BRLYTWriter) WriteGRE() {
+func (b *BRLYTWriter) WriteGRE() error {
 	header := SectionHeader{
 		Type: SectionTypeGRE,
 		Size: 8,
 	}
 
-	write(b, header)
+	return write(b, header)
 }

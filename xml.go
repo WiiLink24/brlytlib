@@ -1,168 +1,21 @@
-package main
+package brlyt
 
-import "encoding/xml"
+import (
+	"bytes"
+	"encoding/xml"
+)
 
-type XMLPane struct {
-	Name      string  `xml:"name,attr"`
-	UserData  string  `xml:"user_data,attr"`
-	Flag      uint8   `xml:"flag"`
-	Origin    Coord2D `xml:"origin"`
-	Alpha     uint8   `xml:"alpha"`
-	Padding   uint8   `xml:"padding"`
-	Translate Coord3D `xml:"translate"`
-	Rotate    Coord3D `xml:"rotate"`
-	Scale     Coord2D `xml:"scale"`
-	Width     float32 `xml:"width"`
-	Height    float32 `xml:"height"`
-}
+type Root struct {
+	XMLName   xml.Name  `xml:"root"`
+	LYT       LYTNode   `xml:"lyt1"`
+	TXL       *TPLNames `xml:"txl1"`
+	FNL       *FNLNames `xml:"fnt1"`
+	MAT       MATNode   `xml:"mat1"`
+	RootPane  XMLPane   `xml:"pan1"`
+	RootGroup XMLGRP    `xml:"grp1"`
 
-type XMLBND struct {
-	Name      string  `xml:"name,attr"`
-	UserData  string  `xml:"user_data,attr"`
-	Flag      uint8   `xml:"flag"`
-	Origin    Coord2D `xml:"origin"`
-	Alpha     uint8   `xml:"alpha"`
-	Padding   uint8   `xml:"padding"`
-	Translate Coord3D `xml:"translate"`
-	Rotate    Coord3D `xml:"rotate"`
-	Scale     Coord2D `xml:"scale"`
-	Width     float32 `xml:"width"`
-	Height    float32 `xml:"height"`
-}
-
-type XMLPIC struct {
-	Name             string     `xml:"name,attr"`
-	UserData         string     `xml:"user_data,attr"`
-	Visible          uint8      `xml:"visible"`
-	Widescreen       uint8      `xml:"widescreen_affected"`
-	Flag             uint8      `xml:"flag"`
-	Origin           Coord2D    `xml:"origin"`
-	Alpha            uint8      `xml:"alpha"`
-	Padding          uint8      `xml:"padding"`
-	Translate        Coord3D    `xml:"translate"`
-	Rotate           Coord3D    `xml:"rotate"`
-	Scale            Coord2D    `xml:"scale"`
-	Width            float32    `xml:"width"`
-	Height           float32    `xml:"height"`
-	TopLeftColor     Color8     `xml:"topLeftColor"`
-	TopRightColor    Color8     `xml:"topRightColor"`
-	BottomLeftColor  Color8     `xml:"bottomLeftColor"`
-	BottomRightColor Color8     `xml:"bottomRightColor"`
-	MatIndex         uint16     `xml:"matIndex"`
-	UVSets           *XMLUVSets `xml:"uv_sets"`
-}
-
-type XMLWindow struct {
-	Name             string         `xml:"name,attr"`
-	UserData         string         `xml:"user_data,attr"`
-	Visible          uint8          `xml:"visible"`
-	Widescreen       uint8          `xml:"widescreen_affected"`
-	Flag             uint8          `xml:"flag"`
-	Origin           Coord2D        `xml:"origin"`
-	Alpha            uint8          `xml:"alpha"`
-	Padding          uint8          `xml:"padding"`
-	Translate        Coord3D        `xml:"translate"`
-	Rotate           Coord3D        `xml:"rotate"`
-	Scale            Coord2D        `xml:"scale"`
-	Width            float32        `xml:"width"`
-	Height           float32        `xml:"height"`
-	Coordinate1      float32        `xml:"coordinate_1"`
-	Coordinate2      float32        `xml:"coordinate_2"`
-	Coordinate3      float32        `xml:"coordinate_3"`
-	Coordinate4      float32        `xml:"coordinate_4"`
-	TopLeftColor     Color8         `xml:"topLeftColor"`
-	TopRightColor    Color8         `xml:"topRightColor"`
-	BottomLeftColor  Color8         `xml:"bottomLeftColor"`
-	BottomRightColor Color8         `xml:"bottomRightColor"`
-	MatIndex         uint16         `xml:"matIndex"`
-	UVSets           *XMLUVSets     `xml:"uv_sets"`
-	Materials        *XMLWindowMats `xml:"materials"`
-}
-
-type XMLGRP struct {
-	Name    string   `xml:"name,attr"`
-	Entries []string `xml:"entries"`
-}
-
-type XMLWindowMat struct {
-	MatIndex uint16 `xml:"matIndex"`
-	Index    uint8  `xml:"index"`
-}
-
-type XMLWindowMats struct {
-	Mats []XMLWindowMat `xml:"mats"`
-}
-
-type XMLUVSets struct {
-	Set []XMLUVSet `xml:"set"`
-}
-
-type XMLUVSet struct {
-	CoordTL STCoordinates `xml:"coordTL"`
-	CoordTR STCoordinates `xml:"coordTR"`
-	CoordBL STCoordinates `xml:"coordBL"`
-	CoordBR STCoordinates `xml:"coordBR"`
-}
-
-type STCoordinates struct {
-	S float32 `xml:"s"`
-	T float32 `xml:"t"`
-}
-
-type XMLTXT struct {
-	Name            string  `xml:"name,attr"`
-	UserData        string  `xml:"user_data,attr"`
-	Visible         uint8   `xml:"visible"`
-	Widescreen      uint8   `xml:"widescreen_affected"`
-	Flag            uint8   `xml:"flag"`
-	Origin          Coord2D `xml:"origin"`
-	Alpha           uint8   `xml:"alpha"`
-	Padding         uint8   `xml:"padding"`
-	Translate       Coord3D `xml:"translate"`
-	Rotate          Coord3D `xml:"rotate"`
-	Scale           Coord2D `xml:"scale"`
-	Width           float32 `xml:"width"`
-	Height          float32 `xml:"height"`
-	MaxStringLength uint16  `xml:"max_string_length"`
-	MatIndex        uint16  `xml:"matIndex"`
-	TextAlignment   uint8   `xml:"textAlignment"`
-	XSize           float32 `xml:"x_size"`
-	YSize           float32 `xml:"y_size"`
-	CharSize        float32 `xml:"charsize"`
-	LineSize        float32 `xml:"linesize"`
-	TopColor        Color8  `xml:"top_color"`
-	BottomColor     Color8  `xml:"bottom_color"`
-	Text            string  `xml:"text"`
-}
-
-type XMLPAS struct{}
-type XMLPAE struct{}
-
-type XMLGRS struct{}
-type XMLGRE struct{}
-
-// Children contains all the possible children a brlyt can contain.
-// This is needed for unmarshalling when we put together a new brlyt.
-type Children struct {
-	Pane *XMLPane   `xml:"pan1"`
-	PAS  *XMLPAS    `xml:"pas1"`
-	PAE  *XMLPAE    `xml:"pae1"`
-	BND  *XMLBND    `xml:"bnd1"`
-	PIC  *XMLPIC    `xml:"pic1"`
-	TXT  *XMLTXT    `xml:"txt1"`
-	WND  *XMLWindow `xml:"wnd1"`
-	GRP  *XMLGRP    `xml:"grp1"`
-	GRS  *XMLGRS    `xml:"grs1"`
-	GRE  *XMLGRE    `xml:"gre1"`
-}
-
-// TPLNames represents the structure of the txl1 section.
-type TPLNames struct {
-	TPLName []string `xml:"tpl_name"`
-}
-
-type FNLNames struct {
-	FNLName []string `xml:"font_name"`
+	reader *bytes.Reader
+	count  uint16
 }
 
 // LYTNode specifies the values that LYT contains
@@ -173,14 +26,13 @@ type LYTNode struct {
 	Height   float32  `xml:"height"`
 }
 
-// Root is the main structure of our XML
-type Root struct {
-	XMLName xml.Name   `xml:"root"`
-	LYT     LYTNode    `xml:"lyt1"`
-	TXL     *TPLNames  `xml:"txl1"`
-	FNL     *FNLNames  `xml:"fnt1"`
-	MAT     MATNode    `xml:"mat1"`
-	Panes   []Children `xml:"children"`
+// TPLNames represents the structure of the txl1 section.
+type TPLNames struct {
+	TPLName []string `xml:"tpl_name"`
+}
+
+type FNLNames struct {
+	FNLName []string `xml:"font_name"`
 }
 
 type MATNode struct {
@@ -336,4 +188,138 @@ type Coord3D struct {
 type Coord2D struct {
 	X float32 `xml:"x"`
 	Y float32 `xml:"y"`
+}
+
+type Children struct {
+	Pane *XMLPane `xml:"pan1"`
+	GRP  *XMLGRP  `xml:"grp1"`
+	PIC  *XMLPIC  `xml:"pic1"`
+	TXT  *XMLTXT  `xml:"txt1"`
+	WND  *XMLWND  `xml:"wnd1"`
+	BND  *XMLPane `xml:"bnd1"`
+}
+
+type XMLPane struct {
+	Name      string     `xml:"name,attr"`
+	UserData  string     `xml:"user_data,attr"`
+	Flag      uint8      `xml:"flag"`
+	Origin    Coord2D    `xml:"origin"`
+	Alpha     uint8      `xml:"alpha"`
+	Padding   uint8      `xml:"padding"`
+	Translate Coord3D    `xml:"translate"`
+	Rotate    Coord3D    `xml:"rotate"`
+	Scale     Coord2D    `xml:"scale"`
+	Width     float32    `xml:"width"`
+	Height    float32    `xml:"height"`
+	Children  []Children `xml:"children"`
+}
+
+type XMLPIC struct {
+	Name             string     `xml:"name,attr"`
+	UserData         string     `xml:"user_data,attr"`
+	Visible          uint8      `xml:"visible"`
+	Widescreen       uint8      `xml:"widescreen_affected"`
+	Flag             uint8      `xml:"flag"`
+	Origin           Coord2D    `xml:"origin"`
+	Alpha            uint8      `xml:"alpha"`
+	Padding          uint8      `xml:"padding"`
+	Translate        Coord3D    `xml:"translate"`
+	Rotate           Coord3D    `xml:"rotate"`
+	Scale            Coord2D    `xml:"scale"`
+	Width            float32    `xml:"width"`
+	Height           float32    `xml:"height"`
+	TopLeftColor     Color8     `xml:"topLeftColor"`
+	TopRightColor    Color8     `xml:"topRightColor"`
+	BottomLeftColor  Color8     `xml:"bottomLeftColor"`
+	BottomRightColor Color8     `xml:"bottomRightColor"`
+	MatIndex         uint16     `xml:"matIndex"`
+	UVSets           *XMLUVSets `xml:"uv_sets"`
+	Children         []Children `xml:"children"`
+}
+
+type XMLTXT struct {
+	Name            string     `xml:"name,attr"`
+	UserData        string     `xml:"user_data,attr"`
+	Visible         uint8      `xml:"visible"`
+	Widescreen      uint8      `xml:"widescreen_affected"`
+	Flag            uint8      `xml:"flag"`
+	Origin          Coord2D    `xml:"origin"`
+	Alpha           uint8      `xml:"alpha"`
+	Padding         uint8      `xml:"padding"`
+	Translate       Coord3D    `xml:"translate"`
+	Rotate          Coord3D    `xml:"rotate"`
+	Scale           Coord2D    `xml:"scale"`
+	Width           float32    `xml:"width"`
+	Height          float32    `xml:"height"`
+	StringLength    uint16     `xml:"string_length"`
+	MaxStringLength uint16     `xml:"max_string_length"`
+	MatIndex        uint16     `xml:"matIndex"`
+	TextAlignment   uint8      `xml:"textAlignment"`
+	XSize           float32    `xml:"x_size"`
+	YSize           float32    `xml:"y_size"`
+	CharSize        float32    `xml:"charsize"`
+	LineSize        float32    `xml:"linesize"`
+	TopColor        Color8     `xml:"top_color"`
+	BottomColor     Color8     `xml:"bottom_color"`
+	Text            string     `xml:"text"`
+	Children        []Children `xml:"children"`
+}
+
+type XMLWND struct {
+	Name             string         `xml:"name,attr"`
+	UserData         string         `xml:"user_data,attr"`
+	Visible          uint8          `xml:"visible"`
+	Widescreen       uint8          `xml:"widescreen_affected"`
+	Flag             uint8          `xml:"flag"`
+	Origin           Coord2D        `xml:"origin"`
+	Alpha            uint8          `xml:"alpha"`
+	Padding          uint8          `xml:"padding"`
+	Translate        Coord3D        `xml:"translate"`
+	Rotate           Coord3D        `xml:"rotate"`
+	Scale            Coord2D        `xml:"scale"`
+	Width            float32        `xml:"width"`
+	Height           float32        `xml:"height"`
+	Coordinate1      float32        `xml:"coordinate_1"`
+	Coordinate2      float32        `xml:"coordinate_2"`
+	Coordinate3      float32        `xml:"coordinate_3"`
+	Coordinate4      float32        `xml:"coordinate_4"`
+	TopLeftColor     Color8         `xml:"topLeftColor"`
+	TopRightColor    Color8         `xml:"topRightColor"`
+	BottomLeftColor  Color8         `xml:"bottomLeftColor"`
+	BottomRightColor Color8         `xml:"bottomRightColor"`
+	MatIndex         uint16         `xml:"matIndex"`
+	UVSets           *XMLUVSets     `xml:"uv_sets"`
+	Materials        *XMLWindowMats `xml:"materials"`
+	Children         []Children     `xml:"children"`
+}
+
+type XMLWindowMat struct {
+	MatIndex uint16 `xml:"matIndex"`
+	Index    uint8  `xml:"index"`
+}
+
+type XMLWindowMats struct {
+	Mats []XMLWindowMat `xml:"mats"`
+}
+
+type XMLUVSets struct {
+	Set []XMLUVSet `xml:"set"`
+}
+
+type XMLUVSet struct {
+	CoordTL STCoordinates `xml:"coordTL"`
+	CoordTR STCoordinates `xml:"coordTR"`
+	CoordBL STCoordinates `xml:"coordBL"`
+	CoordBR STCoordinates `xml:"coordBR"`
+}
+
+type STCoordinates struct {
+	S float32 `xml:"s"`
+	T float32 `xml:"t"`
+}
+
+type XMLGRP struct {
+	Name     string     `xml:"name,attr"`
+	Entries  []string   `xml:"entries"`
+	Children []Children `xml:"children"`
 }

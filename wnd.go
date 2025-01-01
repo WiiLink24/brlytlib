@@ -1,4 +1,4 @@
-package main
+package brlyt
 
 import (
 	"bytes"
@@ -6,51 +6,11 @@ import (
 	"strings"
 )
 
-type Window struct {
-	Flag              uint8
-	Origin            uint8
-	Alpha             uint8
-	_                 uint8
-	PaneName          [16]byte
-	UserData          [8]byte
-	XTranslation      float32
-	YTranslation      float32
-	ZTranslation      float32
-	XRotate           float32
-	YRotate           float32
-	ZRotate           float32
-	XScale            float32
-	YScale            float32
-	Width             float32
-	Height            float32
-	Coordinate1       float32
-	Coordinate2       float32
-	Coordinate3       float32
-	Coordinate4       float32
-	FrameCount        uint8
-	_                 [3]byte
-	WindowOffset      uint32
-	WindowFrameOffset uint32
-	TopLeftColor      [4]uint8
-	TopRightColor     [4]uint8
-	BottomLeftColor   [4]uint8
-	BottomRightColor  [4]uint8
-	MatIndex          uint16
-	NumOfUVSets       uint8
-	_                 uint8
-}
-
-type WindowMat struct {
-	MatIndex uint16
-	Index    uint8
-	_        uint8
-}
-
-func (r *Root) ParseWND(data []byte) {
+func (r *Root) ParseWND(data []byte) (*XMLWND, error) {
 	var wnd Window
 	err := binary.Read(bytes.NewReader(data), binary.BigEndian, &wnd)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	// Strip the null bytes from the strings
@@ -63,9 +23,9 @@ func (r *Root) ParseWND(data []byte) {
 		offset := 116 + (i * 32)
 
 		var uv UVSet
-		err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &uv)
+		err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &uv)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 
 		set := XMLUVSet{
@@ -96,15 +56,15 @@ func (r *Root) ParseWND(data []byte) {
 		offset := 116 + (int(wnd.NumOfUVSets) * 32) + (i * 4)
 
 		var actualOffset uint32
-		err := binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &actualOffset)
+		err = binary.Read(bytes.NewReader(data[offset:]), binary.BigEndian, &actualOffset)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 
 		var mat WindowMat
 		err = binary.Read(bytes.NewReader(data[actualOffset-8:]), binary.BigEndian, &mat)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 
 		material := XMLWindowMat{
@@ -115,7 +75,7 @@ func (r *Root) ParseWND(data []byte) {
 		mats[i] = material
 	}
 
-	xmlData := XMLWindow{
+	xmlData := XMLWND{
 		Name:        name,
 		UserData:    userData,
 		Visible:     wnd.Flag & 0x1,
@@ -162,10 +122,17 @@ func (r *Root) ParseWND(data []byte) {
 		Materials: &XMLWindowMats{Mats: mats},
 	}
 
-	r.Panes = append(r.Panes, Children{WND: &xmlData})
+	if r.HasChildren() {
+		xmlData.Children, err = r.ParseChildren()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &xmlData, nil
 }
 
-func (b *BRLYTWriter) WriteWND(data XMLWindow) {
+func (b *BRLYTWriter) WriteWND(data XMLWND) error {
 	temp := bytes.NewBuffer(nil)
 
 	header := SectionHeader{
@@ -210,8 +177,15 @@ func (b *BRLYTWriter) WriteWND(data XMLWindow) {
 		NumOfUVSets:       uint8(len(data.UVSets.Set)),
 	}
 
-	write(temp, header)
-	write(temp, wnd)
+	err := write(temp, header)
+	if err != nil {
+		return err
+	}
+
+	err = write(temp, wnd)
+	if err != nil {
+		return err
+	}
 
 	// Write the UV Sets
 	for _, set := range data.UVSets.Set {
@@ -226,7 +200,10 @@ func (b *BRLYTWriter) WriteWND(data XMLWindow) {
 			BottomRightT: set.CoordBR.T,
 		}
 
-		write(temp, uvSet)
+		err = write(temp, uvSet)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Write the offsets to the Window Mats
@@ -235,7 +212,10 @@ func (b *BRLYTWriter) WriteWND(data XMLWindow) {
 
 		offset = uint32(temp.Len() + (len(data.Materials.Mats) * 4))
 
-		write(temp, offset)
+		err = write(temp, offset)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Write Window Mats
@@ -245,10 +225,13 @@ func (b *BRLYTWriter) WriteWND(data XMLWindow) {
 			Index:    mat.Index,
 		}
 
-		write(temp, windowMat)
+		err = write(temp, windowMat)
+		if err != nil {
+			return err
+		}
 	}
 
 	binary.BigEndian.PutUint32(temp.Bytes()[4:8], uint32(temp.Len()))
 
-	write(b, temp.Bytes())
+	return write(b, temp.Bytes())
 }

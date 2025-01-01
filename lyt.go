@@ -1,4 +1,4 @@
-package main
+package brlyt
 
 import (
 	"bytes"
@@ -14,14 +14,14 @@ type LYT struct {
 	Height   float32
 }
 
-func (r *Root) ParseLYT(data []byte) {
+func (r *Root) ParseLYT(data []byte) error {
 	// Parse LYT section
 	readable := bytes.NewReader(data)
 
 	var lyt LYT
 	err := binary.Read(readable, binary.BigEndian, &lyt)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	r.LYT = LYTNode{
@@ -30,9 +30,11 @@ func (r *Root) ParseLYT(data []byte) {
 		Width:    lyt.Width,
 		Height:   lyt.Height,
 	}
+
+	return nil
 }
 
-func (b *BRLYTWriter) WriteLYT(data Root) {
+func (b *BRLYTWriter) WriteLYT(data Root) error {
 	header := SectionHeader{
 		Type: SectionTypeLYT,
 		Size: 20,
@@ -45,6 +47,10 @@ func (b *BRLYTWriter) WriteLYT(data Root) {
 		Height:   data.LYT.Height,
 	}
 
-	write(b, header)
-	write(b, lyt)
+	err := write(b, header)
+	if err != nil {
+		return err
+	}
+
+	return write(b, lyt)
 }
