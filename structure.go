@@ -80,8 +80,8 @@ type TXT struct {
 	MaxStringLength uint16
 	MatIndex        uint16
 	FontIndex       uint16
-	Alignment       uint8
-	_               uint8
+	StringOrigin    uint8
+	LineAlignment   uint8
 	_               uint16
 	TextOffset      uint32
 	TopColor        [4]uint8

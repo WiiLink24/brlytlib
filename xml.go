@@ -254,7 +254,8 @@ type XMLTXT struct {
 	StringLength    uint16     `xml:"string_length"`
 	MaxStringLength uint16     `xml:"max_string_length"`
 	MatIndex        uint16     `xml:"matIndex"`
-	TextAlignment   uint8      `xml:"textAlignment"`
+	StringOrigin    uint8      `xml:"string_origin"`
+	LineAlignment   uint8      `xml:"line_alignment"`
 	XSize           float32    `xml:"x_size"`
 	YSize           float32    `xml:"y_size"`
 	CharSize        float32    `xml:"charsize"`
