@@ -670,8 +670,8 @@ func (b *BRLYTWriter) WriteMAT(data Root) error {
 
 		for _, stageEntry := range entry.TevStageEntry {
 			var U16 uint16 = 0
-			U16 |= uint16((stageEntry.TexSel & 0x3F) << 11)
-			U16 |= uint16((stageEntry.RasSel & 0x7) << 9)
+			U16 |= uint16(stageEntry.TexSel&0x3F) << 11
+			U16 |= uint16(stageEntry.RasSel&0x7) << 9
 			U16 |= (stageEntry.TexMap & 0x1ff) << 0
 
 			var B1 uint8 = 0
