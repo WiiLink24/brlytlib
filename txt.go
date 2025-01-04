@@ -7,8 +7,6 @@ import (
 	"unicode/utf16"
 )
 
-const PlaceHolderString = "==== THIS IS PLACEHOLDER TEXT PLEASE DO NOT TRANSLATE ===="
-
 func (r *Root) ParseTXT(data []byte, sectionSize uint32) (*XMLTXT, error) {
 	var text TXT
 	err := binary.Read(bytes.NewReader(data), binary.BigEndian, &text)
@@ -35,10 +33,6 @@ func (r *Root) ParseTXT(data []byte, sectionSize uint32) (*XMLTXT, error) {
 
 	// Strip null bytes
 	decodedString := strings.Replace(string(utf16.Decode(full)), "\x00", "", -1)
-
-	if decodedString == "あああああああああああああああああああ" {
-		decodedString = PlaceHolderString
-	}
 
 	txtXML := XMLTXT{
 		Name:            name,
